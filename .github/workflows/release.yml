@@ -53,6 +53,10 @@ jobs:
             fi
           done
 
+          if [[ "$prerelease" == false ]]; then
+            .github/scripts/changelog-notes.sh "$core" > /dev/null
+          fi
+
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "ocitag=$ocitag" >> "$GITHUB_OUTPUT"
@@ -124,29 +128,33 @@ jobs:
           path: dist-release/*
           if-no-files-found: error
 
-  # Final versions (vX.Y.Z) become GitHub Releases.
+  # Final versions (vX.Y.Z) become GitHub Releases. The release is created as
+  # a draft with the Changelog.md section as notes and must be published manually.
   release:
-    name: Publish GitHub Release
+    name: Create draft GitHub Release
     needs: [prepare, build]
     if: needs.prepare.outputs.prerelease == 'false'
     runs-on: ubuntu-22.04
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: assets
           pattern: installer-*
           merge-multiple: true
 
-      - name: Create release
+      - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release create "$GITHUB_REF_NAME" assets/*
-          --repo "$GITHUB_REPOSITORY" --verify-tag
-          --title "Trailforge ${{ needs.prepare.outputs.version }}"
-          --generate-notes
+        run: |
+          .github/scripts/changelog-notes.sh "${{ needs.prepare.outputs.version }}" > notes.md
+          gh release create "$GITHUB_REF_NAME" assets/* \
+            --repo "$GITHUB_REPOSITORY" --verify-tag --draft \
+            --title "Trailforge ${{ needs.prepare.outputs.version }}" \
+            --notes-file notes.md
 
   # Pre-releases (vX.Y.Z-<any suffix>) are published as GitHub Packages
   # (OCI artifacts in GHCR) and never appear under "Releases".

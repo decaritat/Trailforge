@@ -47,7 +47,10 @@ for broad glibc compatibility). The tag must match the versions in
 (without the pre-release suffix); otherwise the workflow fails before building.
 Nothing is published unless both builds succeed.
 
-- Final tag, e.g. `v0.2.0`: creates a regular GitHub Release with both assets.
+- Final tag, e.g. `v0.2.0`: creates a **draft** GitHub Release with both
+  assets. The description is taken from the `## [0.2.0]` section of
+  `Changelog.md`, which must exist and be non-empty (checked before building).
+  Review the draft and publish it manually on GitHub.
 - Pre-release, i.e. `vX.Y.Z-<anything>` such as `v0.2.0-rc.1` or
   `v0.2.0-nightly`: no GitHub Release is created. The
   installers are pushed to GitHub Packages as an OCI artifact

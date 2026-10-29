@@ -11,9 +11,10 @@ once released versions are maintained.
 ### Added
 
 - Added a tag-triggered release workflow that builds a Windows NSIS installer
-  and a Linux AppImage, verifies the tag against the project versions, publishes
-  final `vX.Y.Z` tags as GitHub Releases, and publishes pre-release tags (e.g. `-rc.1`, `-beta.2`) to
-  GitHub Packages only.
+  and a Linux AppImage and verifies the tag against the project versions. Final
+  `vX.Y.Z` tags create a draft GitHub Release whose notes come from the matching
+  `Changelog.md` section; any `vX.Y.Z-<suffix>` tag is published to GitHub
+  Packages only.
 - Added an editable project title and description, plus accessible route-card
   actions for properties, GPX export, and confirmed route removal.
 - Extracted route geometry, metrics, elevation-profile calculations, GPX handling,
