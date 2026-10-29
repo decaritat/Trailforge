@@ -15,6 +15,7 @@ jobs:
     outputs:
       version: ${{ steps.parse.outputs.version }}
       prerelease: ${{ steps.parse.outputs.prerelease }}
+      ocitag: ${{ steps.parse.outputs.ocitag }}
     steps:
       - uses: actions/checkout@v4
 
@@ -22,14 +23,25 @@ jobs:
         id: parse
         run: |
           tag="${GITHUB_REF_NAME}"
-          re='^v(([0-9]+)\.([0-9]+)\.([0-9]+))(-[0-9A-Za-z]+(\.[0-9A-Za-z]+)*)?$'
+          re='^v([0-9]+\.[0-9]+\.[0-9]+)(-.+)?$'
           if [[ ! "$tag" =~ $re ]]; then
-            echo "::error::Tag '$tag' must look like v1.2.3 or a SemVer pre-release such as v1.2.3-rc.1, v1.2.3-beta.2"
+            echo "::error::Tag '$tag' must look like v1.2.3 or v1.2.3-<suffix>"
             exit 1
           fi
-          version="${tag#v}"
           core="${BASH_REMATCH[1]}"
-          if [[ -n "${BASH_REMATCH[5]}" ]]; then prerelease=true; else prerelease=false; fi
+          if [[ -n "${BASH_REMATCH[2]}" ]]; then prerelease=true; else prerelease=false; fi
+
+          # Use the full tag version for the bundle only if it is valid SemVer;
+          # otherwise build with the core version.
+          semver='^[0-9]+\.[0-9]+\.[0-9]+(-(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*)?$'
+          version="${tag#v}"
+          if [[ ! "$version" =~ $semver ]]; then
+            echo "::warning::Suffix of $tag is not valid SemVer; bundling version $core"
+            version="$core"
+          fi
+
+          # OCI tags allow only [A-Za-z0-9_.-], up to 128 characters.
+          ocitag=$(printf '%s' "${tag}" | tr -c 'A-Za-z0-9_.-' '-' | cut -c1-128)
 
           pkg=$(node -p "require('./package.json').version")
           tauri=$(node -p "require('./src-tauri/tauri.conf.json').version")
@@ -43,6 +55,7 @@ jobs:
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "ocitag=$ocitag" >> "$GITHUB_OUTPUT"
 
   build:
     name: Build (${{ matrix.name }})
@@ -135,7 +148,7 @@ jobs:
           --title "Trailforge ${{ needs.prepare.outputs.version }}"
           --generate-notes
 
-  # Pre-releases (vX.Y.Z-<identifier>, e.g. -alpha.1, -beta.2, -rc.1) are published as GitHub Packages
+  # Pre-releases (vX.Y.Z-<any suffix>) are published as GitHub Packages
   # (OCI artifacts in GHCR) and never appear under "Releases".
   package:
     name: Publish pre-release to Packages
@@ -161,7 +174,7 @@ jobs:
           repo="${GITHUB_REPOSITORY,,}"
           echo "$GH_TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
           cd assets
-          oras push "ghcr.io/${repo}/installers:${GITHUB_REF_NAME}" \
+          oras push "ghcr.io/${repo}/installers:${{ needs.prepare.outputs.ocitag }}" \
             --annotation "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
             --annotation "org.opencontainers.image.description=Trailforge pre-release ${{ needs.prepare.outputs.version }} (not a final release)" \
             --annotation "org.opencontainers.image.version=${{ needs.prepare.outputs.version }}" \

@@ -48,10 +48,11 @@ for broad glibc compatibility). The tag must match the versions in
 Nothing is published unless both builds succeed.
 
 - Final tag, e.g. `v0.2.0`: creates a regular GitHub Release with both assets.
-- Pre-release with any SemVer suffix, e.g. `v0.2.0-rc.1`, `v0.2.0-beta.2`,
-  `v0.2.0-alpha.1`: no GitHub Release is created. The
+- Pre-release, i.e. `vX.Y.Z-<anything>` such as `v0.2.0-rc.1` or
+  `v0.2.0-nightly`: no GitHub Release is created. The
   installers are pushed to GitHub Packages as an OCI artifact
-  (`ghcr.io/<owner>/trailforge/installers:v0.2.0-rc.1`, downloadable with
+  (`ghcr.io/<owner>/trailforge/installers:v0.2.0-rc.1`; characters not allowed
+  in OCI tags become `-`), downloadable with
   `oras pull`).
 
 ```text
