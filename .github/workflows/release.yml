@@ -61,9 +61,14 @@ jobs:
           echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
           echo "ocitag=$ocitag" >> "$GITHUB_OUTPUT"
 
+  licenses:
+    name: Licenses and SBOM
+    needs: prepare
+    uses: ./.github/workflows/licenses.yml
+
   build:
     name: Build (${{ matrix.name }})
-    needs: prepare
+    needs: [prepare, licenses]
     strategy:
       fail-fast: true
       matrix:
@@ -100,6 +105,11 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
             libayatana-appindicator3-dev librsvg2-dev libssl-dev patchelf xdg-utils
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: licenses
+          path: licenses
+
       - run: npm ci
       - run: npm run lint
       - run: npm test
@@ -108,7 +118,7 @@ jobs:
         shell: bash
         run: >-
           npx tauri build --bundles ${{ matrix.bundle }}
-          --config '{"version":"${{ needs.prepare.outputs.version }}"}'
+          --config '{"version":"${{ needs.prepare.outputs.version }}","bundle":{"resources":{"../LICENSE":"LICENSE","../licenses/THIRD-PARTY-NOTICES.md":"THIRD-PARTY-NOTICES.md"}}}'
 
       - name: Collect artifact
         shell: bash
@@ -146,6 +156,11 @@ jobs:
           pattern: installer-*
           merge-multiple: true
 
+      - uses: actions/download-artifact@v4
+        with:
+          name: licenses
+          path: assets
+
       - name: Create draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -172,6 +187,11 @@ jobs:
           path: assets
           pattern: installer-*
           merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: licenses
+          path: assets
 
       - uses: oras-project/setup-oras@v1
 
