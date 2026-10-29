@@ -80,7 +80,7 @@ def main():
         repo = repo.get("url") if isinstance(repo, dict) else repo
         copyright_lines = sorted({
             line.strip() for line in text.splitlines()
-            if re.match(r"\s*(copyright|\(c\))", line, re.I)
+            if re.match(r"\s*(copyright\s*(\(c\)|©|\d)|\(c\)\s*\d|©)", line, re.I)
         })
         packages.append({
             "name": name, "version": info.get("version", ""), "license": lic,

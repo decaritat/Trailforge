@@ -34,7 +34,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Install license tools
-        run: cargo install --locked cargo-about cargo-cyclonedx
+        run: |
+          cargo install --locked cargo-about --features cli
+          cargo install --locked cargo-cyclonedx
 
       - name: Verify lock files are in sync
         run: |
