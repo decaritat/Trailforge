@@ -36,7 +36,7 @@ npm run desktop:dev
 npm run desktop:build
 ```
 
-The planned next development stages are listed in [Roadmap.md](Roadmap.md). Architecture and development rules are documented in [.github/copilot-instructions.md](.github/copilot-instructions.md).
+Architecture and development rules are documented in [.github/copilot-instructions.md](.github/copilot-instructions.md).
 
 ## Releases
 
