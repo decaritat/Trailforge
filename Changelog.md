@@ -10,6 +10,9 @@ once released versions are maintained.
 
 ### Added
 
+- Added a CI workflow that runs lint, unit tests, the web build, and a Tauri
+  build without installer on Linux and Windows for every pull request and push
+  to `main`.
 - Added a license workflow that generates `THIRD-PARTY-NOTICES.md` and
   CycloneDX SBOMs for npm and Rust dependencies, fails on unknown or
   disallowed licenses, and ships the notices with installers and releases.
