@@ -10,6 +10,9 @@ once released versions are maintained.
 
 ### Added
 
+- Added a license workflow that generates `THIRD-PARTY-NOTICES.md` and
+  CycloneDX SBOMs for npm and Rust dependencies, fails on unknown or
+  disallowed licenses, and ships the notices with installers and releases.
 - Added a tag-triggered release workflow that builds a Windows NSIS installer
   and a Linux AppImage and verifies the tag against the project versions. Final
   `vX.Y.Z` tags create a draft GitHub Release whose notes come from the matching

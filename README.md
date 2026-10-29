@@ -63,6 +63,19 @@ git tag v0.2.0-rc.1 && git push origin v0.2.0-rc.1
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
+### Licenses and SBOM
+
+Trailforge is GPL-3.0-or-later. `.github/workflows/licenses.yml` (on every
+dependency change and before every release build) generates
+`THIRD-PARTY-NOTICES.md` (package, version, origin, license, copyright, full
+license texts) for production npm dependencies and Rust crates, plus CycloneDX
+SBOMs (`sbom-npm.cdx.json`, `sbom-rust.cdx.json`). The job fails if a lock file
+is out of sync or a dependency has an unknown license or one not on the
+allowlist (`.github/scripts/npm_notices.py`, `src-tauri/about.toml`). The
+notices and `LICENSE` are bundled into the installers and attached to the
+release/package. Binary distribution under GPLv3 requires offering the
+corresponding source: the tagged GitHub repository serves as that source.
+
 ## Development with AI assistance
 
 Trailforge is developed with the assistance of AI. AI is used for requirements analysis, architectural decisions, implementation, documentation, and quality assurance. Decisions, code reviews, and responsibility for the results remain with the project team.
