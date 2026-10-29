@@ -38,6 +38,26 @@ npm run desktop:build
 
 The planned next development stages are listed in [Roadmap.md](Roadmap.md). Architecture and development rules are documented in [.github/copilot-instructions.md](.github/copilot-instructions.md).
 
+## Releases
+
+Pushing a tag starting with `v` runs `.github/workflows/release.yml`. It
+builds a Windows NSIS installer (`.exe`) and a Linux AppImage (on Ubuntu 22.04
+for broad glibc compatibility). The tag must match the versions in
+`package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`
+(without the `-rc.N` suffix); otherwise the workflow fails before building.
+Nothing is published unless both builds succeed.
+
+- Final tag, e.g. `v0.2.0`: creates a regular GitHub Release with both assets.
+- Release candidate, e.g. `v0.2.0-rc.1`: no GitHub Release is created. The
+  installers are pushed to GitHub Packages as an OCI artifact
+  (`ghcr.io/<owner>/trailforge/installers:v0.2.0-rc.1`, downloadable with
+  `oras pull`).
+
+```text
+git tag v0.2.0-rc.1 && git push origin v0.2.0-rc.1
+git tag v0.2.0 && git push origin v0.2.0
+```
+
 ## Development with AI assistance
 
 Trailforge is developed with the assistance of AI. AI is used for requirements analysis, architectural decisions, implementation, documentation, and quality assurance. Decisions, code reviews, and responsibility for the results remain with the project team.

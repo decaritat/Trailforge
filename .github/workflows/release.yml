@@ -1,0 +1,168 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Validate tag and versions
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.parse.outputs.version }}
+      prerelease: ${{ steps.parse.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse tag and compare with project versions
+        id: parse
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          re='^v(([0-9]+)\.([0-9]+)\.([0-9]+))(-rc\.[0-9]+)?$'
+          if [[ ! "$tag" =~ $re ]]; then
+            echo "::error::Tag '$tag' must look like v1.2.3 or v1.2.3-rc.1"
+            exit 1
+          fi
+          version="${tag#v}"
+          core="${BASH_REMATCH[1]}"
+          if [[ -n "${BASH_REMATCH[5]}" ]]; then prerelease=true; else prerelease=false; fi
+
+          pkg=$(node -p "require('./package.json').version")
+          tauri=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n1)
+          for entry in "package.json=$pkg" "src-tauri/tauri.conf.json=$tauri" "src-tauri/Cargo.toml=$cargo"; do
+            if [[ "${entry#*=}" != "$core" ]]; then
+              echo "::error::${entry%%=*} has version ${entry#*=}, but tag $tag requires $core"
+              exit 1
+            fi
+          done
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build (${{ matrix.name }})
+    needs: prepare
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - name: Windows NSIS
+            os: windows-latest
+            bundle: nsis
+            glob: src-tauri/target/release/bundle/nsis/*.exe
+          # Oldest available Ubuntu runner so the AppImage stays compatible
+          # with older distributions' glibc.
+          - name: Linux AppImage
+            os: ubuntu-22.04
+            bundle: appimage
+            glob: src-tauri/target/release/bundle/appimage/*.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
+            libayatana-appindicator3-dev librsvg2-dev libssl-dev patchelf xdg-utils
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+
+      - name: Build bundle
+        shell: bash
+        run: >-
+          npx tauri build --bundles ${{ matrix.bundle }}
+          --config '{"version":"${{ needs.prepare.outputs.version }}"}'
+
+      - name: Collect artifact
+        shell: bash
+        run: |
+          mkdir -p dist-release
+          shopt -s nullglob
+          files=(${{ matrix.glob }})
+          if [[ ${#files[@]} -ne 1 ]]; then
+            echo "::error::Expected exactly one artifact for ${{ matrix.glob }}, found ${#files[@]}"
+            exit 1
+          fi
+          cp "${files[0]}" dist-release/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-${{ matrix.bundle }}
+          path: dist-release/*
+          if-no-files-found: error
+
+  # Final versions (vX.Y.Z) become GitHub Releases.
+  release:
+    name: Publish GitHub Release
+    needs: [prepare, build]
+    if: needs.prepare.outputs.prerelease == 'false'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          pattern: installer-*
+          merge-multiple: true
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" assets/*
+          --repo "$GITHUB_REPOSITORY" --verify-tag
+          --title "Trailforge ${{ needs.prepare.outputs.version }}"
+          --generate-notes
+
+  # Release candidates (vX.Y.Z-rc.N) are published as GitHub Packages
+  # (OCI artifacts in GHCR) and never appear under "Releases".
+  package:
+    name: Publish release candidate to Packages
+    needs: [prepare, build]
+    if: needs.prepare.outputs.prerelease == 'true'
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          pattern: installer-*
+          merge-multiple: true
+
+      - uses: oras-project/setup-oras@v1
+
+      - name: Push to GHCR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          repo="${GITHUB_REPOSITORY,,}"
+          echo "$GH_TOKEN" | oras login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          cd assets
+          oras push "ghcr.io/${repo}/installers:${GITHUB_REF_NAME}" \
+            --annotation "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}" \
+            --annotation "org.opencontainers.image.description=Trailforge release candidate ${{ needs.prepare.outputs.version }} (not a final release)" \
+            --annotation "org.opencontainers.image.version=${{ needs.prepare.outputs.version }}" \
+            ./*
