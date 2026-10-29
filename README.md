@@ -1,0 +1,88 @@
+# Trailforge
+
+Trailforge is a locally installable open-source application for planning hikes and cycling tours. It is intended as a clear alternative to online outdoor platforms for tour planning and navigation: routes are created, edited, analyzed, and exported as GPX files on an OpenStreetMap-based map.
+
+Trailforge is intended to run on Windows 11 and Linux. The desktop application is based on Tauri 2, React, TypeScript, and Leaflet. Map data is loaded online by default; offline and cache support is planned for a later stage.
+
+## Current status
+
+- OpenStreetMap Carto and OpenTopoMap
+- Manually triggered place search for towns, landmarks, and other locations, with map highlighting
+- Multiple independently editable hiking and cycling routes
+- Routing through BRouter with separate hiking-beta and trekking profiles and a
+  direct fallback when the provider fails
+- Route waypoints created by clicking, deleted through the context menu or Delete key, and inserted by dragging onto the route
+- Route name, description, type, and color
+- Elevation profile with distance, elevation, and time information
+- Distance, ascent, descent, duration, highest-point, and lowest-point metrics
+- Saving and opening project files
+- GPX export and read-only GPX import by default
+- Independent points on the map
+- Zoom-dependent map scale and north arrow
+
+## Development
+
+```text
+npm install
+npm run dev
+npm run build
+npm run lint
+```
+
+The Tauri desktop shell requires Rust and the platform-specific prerequisites for Tauri 2:
+
+```text
+npm run desktop:dev
+npm run desktop:build
+```
+
+The planned next development stages are listed in [Roadmap.md](Roadmap.md). Architecture and development rules are documented in [.github/copilot-instructions.md](.github/copilot-instructions.md).
+
+## Development with AI assistance
+
+Trailforge is developed with the assistance of AI. AI is used for requirements analysis, architectural decisions, implementation, documentation, and quality assurance. Decisions, code reviews, and responsibility for the results remain with the project team.
+
+## Data, attribution, and license
+
+Map data and map tiles are currently loaded online and are not bundled with the application. OpenStreetMap attribution is displayed in the application. Before using additional providers, their terms of use, tile limits, API requirements, and attribution requirements must be checked.
+
+### Place search
+
+Place search uses the public Nominatim service. Searches are sent only after
+the user submits the search field; there is no autocomplete. Results include
+OpenStreetMap attribution. Search results with area geometry are outlined and
+fitted to the map; point results receive a temporary pin. The Tauri desktop
+application identifies its request with a `Trailforge` User-Agent.
+
+The public Nominatim service has limited capacity. Its policy requires
+identifying the application, visible attribution, no more than one request per
+second across the application, and the ability to switch services if requested.
+Trailforge caches results for the current app session and prevents searches
+more frequent than once per second in that session. This client-side limit
+cannot enforce the aggregate limit across all Trailforge installations; usage
+must remain moderate, and a configurable provider or proxy is needed before
+relying on the public service at larger scale. See the
+[Nominatim Usage Policy](https://operations.osmfoundation.org/policies/nominatim/).
+
+### Routing provider
+
+Trailforge currently uses the public BRouter instance at
+`https://brouter.de/brouter`. It does not require an API key and
+selects the routing mode from the route type:
+
+| Route type | BRouter profile | Routing behavior |
+| --- | --- | --- |
+| Hiking | `hiking-beta` | Hiking profile for foot routes and trails |
+| Cycling | `trekking` | Elevation-aware cycling profile with a preference for routes away from car traffic |
+
+The public endpoint currently returns a successful route for `hiking-beta`;
+the `hiking` profile currently responds with an HTTP 500 error and is
+therefore not used. BRouter was selected because its profiles are configurable,
+elevation-aware, and available without an API key. The public service is subject to its
+availability and fair-use policies; self-hosting BRouter remains an option for
+predictable capacity and custom profiles. GraphHopper and OpenRouteService
+provide strong hiking and cycling profiles, but their hosted APIs normally
+require an API key. OSRM is fast and its public demo currently accepts `foot`
+and `cycling`, but its profiles are statically prepared by the server.
+
+The project is licensed under [GNU GPL-3.0-or-later](LICENSE). Derived projects and forks must comply with the applicable copyleft obligations.

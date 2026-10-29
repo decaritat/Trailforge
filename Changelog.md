@@ -1,0 +1,62 @@
+# Changelog
+
+All notable changes to Trailforge are documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
+Trailforge follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
+once released versions are maintained.
+
+## [Unreleased]
+
+### Added
+
+- Added an editable project title and description, plus accessible route-card
+  actions for properties, GPX export, and confirmed route removal.
+- Extracted route geometry, metrics, elevation-profile calculations, GPX handling,
+  and project normalization into independently testable modules with Vitest
+  unit coverage.
+- Restricted project title and description fields to edit mode, hid the project
+  description counter outside that mode, and auto-sized the description field
+  without exceeding a quarter of the sidebar.
+- Made project and route descriptions editable in bounded, 180-character drafts
+  with explicit apply/cancel actions; route properties now open in a separate
+  panel beside the route list.
+- Added GPX export into each route's action menu.
+- Use elevation samples returned by BRouter and GPX files for route metrics,
+  profiles, and GPX exports.
+- Added the map tool selection into a Leaflet-style control rail under the zoom
+  buttons. The rail now provides read-only map panning, route editing,
+  point/POI placement, and fitting the active route to the map.
+- Added mode-specific map cursors and protected route nodes from editing,
+  dragging, insertion, and deletion while read-only panning is active.
+- Added routing provider BRouter. Hiking routes use `hiking-beta` and cycling
+  routes use `trekking`; BRouter GeoJSON geometry is normalized before it is 
+  displayed.
+- Added a unified Trailforge route-and-mountain app icon for the application
+  header, browser favicon, and Tauri platform icons.
+- Added a manually submitted place search beside the map toolbar, with an
+  attributed result list, zoom-to-area behavior, temporary area outlines, and
+  pins for point results.
+- Synchronized the expanded elevation profile with the active route by showing
+  a route-colored, white position marker during profile hover and ignoring
+  invalid chart-edge positions.
+- Unified route statistics and elevation-profile presentation with a compact
+  collapsed view, an expanded interactive view, consistent metric ordering,
+  distance-based axis scaling, a clickable mini-profile opener, and an
+  in-panel close button.
+- Support for separate hiking and cycling routes with a name, description,
+  color, and route type.
+- Routing through the configured routing provider with a direct fallback.
+- Route waypoint editing, including selection, deletion, and insertion.
+- Elevation profile and route statistics for the active route.
+- GPX export, and saving and opening project files.
+- Independent map points and a zoom-dependent map scale.
+- Tauri desktop shell based on React, TypeScript, and Vite.
+
+<!--
+Categories from Keep a Changelog:
+Added, Changed, Deprecated, Removed, Fixed, Security.
+
+Add new changes only under [Unreleased]. When a release is published, assign
+the changes to a version and add the release date.
+-->
