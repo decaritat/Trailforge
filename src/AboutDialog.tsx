@@ -177,7 +177,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
           <div>
             <h2 id="about-title">Trailforge</h2>
             <span className="about-version">Version {version}</span>
-            <p>Open-Source-Routenplaner für Wander- und Radtouren · GPL-3.0-or-later</p>
+            <p>Open-Source-Routenplaner für Wander- und Radtouren</p>
           </div>
           <button className="icon-button about-close" type="button" onClick={onClose} aria-label="Schließen">
             ×
