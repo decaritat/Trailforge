@@ -123,6 +123,7 @@ jobs:
         shell: bash
         env:
           TRAILFORGE_KEEP_NOTICES: "1"
+          VITE_APP_VERSION: ${{ needs.prepare.outputs.version }}
         run: >-
           npx tauri build --bundles ${{ matrix.bundle }}
           --config '{"version":"${{ needs.prepare.outputs.version }}","bundle":{"resources":{"../LICENSE":"LICENSE","../licenses/THIRD-PARTY-NOTICES.md":"THIRD-PARTY-NOTICES.md"}}}'

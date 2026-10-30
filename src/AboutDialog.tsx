@@ -10,7 +10,7 @@ import {
 import { createPortal } from 'react-dom'
 import { isTauri } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { version } from '../package.json'
+import { getAppVersion } from './appVersion'
 import './AboutDialog.css'
 
 const REPOSITORY_URL = 'https://github.com/decaritat/Trailforge'
@@ -91,6 +91,16 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
   const [query, setQuery] = useState('')
   const [ecosystem, setEcosystem] = useState<'all' | Ecosystem>('all')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [version, setVersion] = useState('')
+
+  useEffect(() => {
+    getAppVersion()
+      .then(setVersion)
+      .catch((error) => {
+        console.error('Version konnte nicht gelesen werden', error)
+        setVersion('unbekannt')
+      })
+  }, [])
 
   useEffect(() => {
     let cancelled = false
