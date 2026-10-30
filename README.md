@@ -19,7 +19,8 @@ Trailforge is intended to run on Windows 11 and Linux. The desktop application i
 - GPX export and read-only GPX import by default
 - Independent points on the map
 - Zoom-dependent map scale and north arrow
-
+- About dialog (Info) with version, project links, data attributions, and a
+  filterable list of third-party components with license texts
 ## Development
 
 ```text
@@ -37,6 +38,13 @@ npm run desktop:build
 ```
 
 Architecture and development rules are documented in [.github/copilot-instructions.md](.github/copilot-instructions.md).
+
+The About dialog lists third-party components from
+`src/generated/third-party.json`, which `npm run dev` and `npm run build`
+generate with `scripts/generate-third-party.mjs` (npm packages from
+`package-lock.json` after `npm ci`, Rust crates through `cargo about`). Without
+`cargo-about` the Rust crates are left out and the dialog says so; release
+builds require them.
 
 ## Releases
 

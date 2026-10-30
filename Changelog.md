@@ -10,6 +10,11 @@ once released versions are maintained.
 
 ### Added
 
+- Added an About dialog (Info button) showing the Trailforge version, links to
+  the GitHub project, documentation, changelog, and license, data and service
+  attributions (OpenStreetMap, OpenTopoMap, Nominatim, BRouter, Leaflet), and a
+  filterable list of npm and Rust third-party components with their license
+  texts. External links open in the system browser in the desktop app.
 - Added a CI workflow that runs lint, unit tests, the web build, and a Tauri
   build without installer on Linux and Windows for every pull request and push
   to `main`.

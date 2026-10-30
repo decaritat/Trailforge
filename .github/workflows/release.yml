@@ -111,11 +111,18 @@ jobs:
           path: licenses
 
       - run: npm ci
+      - name: Provide third-party list for the About dialog
+        shell: bash
+        run: |
+          mkdir -p src/generated
+          cp licenses/third-party.json src/generated/third-party.json
       - run: npm run lint
       - run: npm test
 
       - name: Build bundle
         shell: bash
+        env:
+          TRAILFORGE_KEEP_NOTICES: "1"
         run: >-
           npx tauri build --bundles ${{ matrix.bundle }}
           --config '{"version":"${{ needs.prepare.outputs.version }}","bundle":{"resources":{"../LICENSE":"LICENSE","../licenses/THIRD-PARTY-NOTICES.md":"THIRD-PARTY-NOTICES.md"}}}'

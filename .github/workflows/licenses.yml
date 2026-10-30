@@ -13,6 +13,7 @@ on:
       - src-tauri/about.toml
       - src-tauri/about.hbs
       - .github/scripts/npm_notices.py
+      - scripts/generate-third-party.mjs
       - .github/workflows/licenses.yml
   workflow_call:
 
@@ -59,6 +60,7 @@ jobs:
             cat licenses/rust.md
           } > licenses/THIRD-PARTY-NOTICES.md
           rm licenses/npm.md licenses/rust.md
+          node scripts/generate-third-party.mjs --out licenses/third-party.json --require-rust
 
       - name: Generate SBOMs
         run: |
