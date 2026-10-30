@@ -48,6 +48,13 @@ import {
 } from './routeMetrics'
 import { escapeXml, parseGpx, toGpx } from './gpx'
 import { normalizeProject, readInitialProject } from './project'
+import {
+  defaultPoiIcon,
+  getPoiIcon,
+  POI_ICON_CATEGORIES,
+  poiIconSvg,
+  type PoiIconId,
+} from './poiIcons'
 
 type ToolMode = 'pan' | 'route' | 'point'
 type MapToolIconName = 'search' | 'pan' | 'route' | 'point' | 'focus'
@@ -299,8 +306,16 @@ function App() {
     top: number
     left: number
   } | null>(null)
+  const [pointEditor, setPointEditor] = useState<{
+    pointId: string
+    draft: MapPoint
+    isNew: boolean
+    top: number
+    left: number
+  } | null>(null)
   const [selectedNode, setSelectedNode] = useState<{ routeId: string; nodeId: string } | null>(null)
   const [hoveredProfilePoint, setHoveredProfilePoint] = useState<ProfilePointDetails | null>(null)
+  const [poiIconPickerOpen, setPoiIconPickerOpen] = useState(false)
   const importInput = useRef<HTMLInputElement>(null)
   const projectInput = useRef<HTMLInputElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
@@ -357,7 +372,7 @@ function App() {
 
   const activeRoute =
     project.routes.find((route) => route.id === project.activeRouteId) ?? project.routes[0]
-  const routePropertiesOpen = Boolean(routeEditor)
+  const routePropertiesOpen = Boolean(routeEditor || pointEditor)
   const activeMetrics = useMemo(
     () => (activeRoute ? routeMetrics(activeRoute) : null),
     [activeRoute],
@@ -398,6 +413,28 @@ function App() {
           ? 'Klicke auf die Karte, um einen Routenpunkt zu setzen.'
           : 'Klicke auf die Karte, um einen Punkt oder POI zu setzen.',
     )
+  }
+
+  function openPointEditor(point: MapPoint, isNew: boolean, clientX: number, clientY: number) {
+    const dialogWidth = Math.min(390, window.innerWidth - 16)
+    const dialogHeight = Math.min(600, window.innerHeight - 16)
+    const gap = 18
+    const left =
+      clientX + gap + dialogWidth <= window.innerWidth - 8
+        ? clientX + gap
+        : Math.max(8, clientX - dialogWidth - gap)
+    const top = Math.min(
+      Math.max(8, clientY - 54),
+      Math.max(8, window.innerHeight - dialogHeight - 8),
+    )
+    setPoiIconPickerOpen(false)
+    setPointEditor({
+      pointId: point.id,
+      draft: point,
+      isNew,
+      top,
+      left,
+    })
   }
 
   const updateNode = useCallback((routeId: string, nodeId: string, coordinate: Coordinate) => {
@@ -899,16 +936,29 @@ function App() {
       })
     })
     project.points.forEach((point) => {
+      const icon = getPoiIcon(point.icon)
+      const label = escapeXml(point.name.trim() || 'POI')
       const marker = L.marker([point.coordinate[1], point.coordinate[0]], {
         icon: L.divIcon({
           className: 'point-marker-wrapper',
-          html: '<span class="point-marker"></span>',
-          iconSize: [15, 15],
-          iconAnchor: [7, 7],
+          html: `<span class="point-marker"><span class="point-marker-badge"><span class="point-marker-symbol">${poiIconSvg(
+            icon,
+          )}</span></span><span class="point-marker-label">${label}</span></span>`,
+          iconSize: [260, 42],
+          iconAnchor: [14, 38],
         }),
       })
-        .bindPopup(`<strong>${escapeXml(point.name)}</strong><br/>${escapeXml(point.description)}`)
         .addTo(map)
+      marker.on('click', (event: L.LeafletMouseEvent) => {
+        if (routePropertiesOpen) return
+        event.originalEvent.stopPropagation()
+        openPointEditor(
+          { ...point, icon: icon.id },
+          false,
+          event.originalEvent.clientX,
+          event.originalEvent.clientY,
+        )
+      })
       markersRef.current.push(marker)
     })
     return () => {
@@ -926,13 +976,18 @@ function App() {
       if (toolMode === 'point') {
         const point: MapPoint = {
           id: uid('point'),
-          name: 'Neuer Punkt',
-          description: 'Manuell gesetzter Punkt.',
+          name: 'Neuer POI',
+          description: '',
           coordinate: [event.latlng.lng, event.latlng.lat],
-          source: 'manual',
+          source: 'poi',
+          icon: defaultPoiIcon,
         }
-        setProject((current) => ({ ...current, points: [...current.points, point] }))
-        setNotice('Punkt angelegt. Öffne ihn auf der Karte, um Details zu sehen.')
+        openPointEditor(
+          point,
+          true,
+          event.originalEvent.clientX,
+          event.originalEvent.clientY,
+        )
         return
       }
       if (toolMode === 'pan') return
@@ -1122,6 +1177,47 @@ function App() {
     setRouteEditor((current) =>
       current ? { ...current, draft: { ...current.draft, ...patch } } : current,
     )
+  }
+
+  function updatePointDraft(patch: Partial<MapPoint>) {
+    setPointEditor((current) =>
+      current ? { ...current, draft: { ...current.draft, ...patch } } : current,
+    )
+  }
+
+  function savePointProperties() {
+    if (!pointEditor) return
+    const point = {
+      ...pointEditor.draft,
+      name: pointEditor.draft.name.trim() || 'Neuer POI',
+      description: pointEditor.draft.description.slice(0, 180),
+      icon: getPoiIcon(pointEditor.draft.icon).id,
+    }
+    setProject((current) => ({
+      ...current,
+      points: pointEditor.isNew
+        ? [...current.points, point]
+        : current.points.map((item) => (item.id === point.id ? point : item)),
+    }))
+    setPointEditor(null)
+    setNotice(pointEditor.isNew ? 'POI angelegt.' : 'POI aktualisiert.')
+  }
+
+  function deletePoint(pointId: string) {
+    setProject((current) => ({
+      ...current,
+      points: current.points.filter((point) => point.id !== pointId),
+    }))
+    setPointEditor(null)
+    setNotice('POI gelöscht.')
+  }
+
+  function confirmDeletePoint() {
+    if (!pointEditor || pointEditor.isNew) return
+    const pointName = pointEditor.draft.name.trim() || 'Neuer POI'
+    if (window.confirm(`Soll der POI „${pointName}“ wirklich gelöscht werden?`)) {
+      deletePoint(pointEditor.pointId)
+    }
   }
 
   function saveRouteProperties() {
@@ -1600,6 +1696,131 @@ function App() {
     )
   }
 
+  function renderPointEditor(point: MapPoint) {
+    const selectedIcon = getPoiIcon(point.icon)
+    const isNew = pointEditor?.isNew ?? false
+
+    return (
+      <section
+        className="route-editor poi-editor"
+        role="dialog"
+        aria-modal="true"
+        aria-label={isNew ? 'Neuen POI anlegen' : `POI ${point.name} bearbeiten`}
+        style={{ top: pointEditor?.top, left: pointEditor?.left }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setPointEditor(null)
+        }}
+      >
+        <div className="route-editor-heading">
+          <span className="eyebrow">{isNew ? 'POI anlegen' : 'POI-Eigenschaften'}</span>
+          <span
+            className="poi-editor-selected-icon"
+            aria-hidden="true"
+            dangerouslySetInnerHTML={{ __html: poiIconSvg(selectedIcon) }}
+          />
+        </div>
+        <div className={`poi-icon-picker ${poiIconPickerOpen ? 'open' : ''}`}>
+          <button
+            className="poi-icon-picker-toggle"
+            type="button"
+            aria-expanded={poiIconPickerOpen}
+            aria-controls={`poi-icon-picker-options-${point.id}`}
+            onClick={() => setPoiIconPickerOpen((open) => !open)}
+          >
+            <span className="route-editor-section-label">Symbol</span>
+            <span className="poi-icon-picker-current">
+              <span
+                className="poi-icon-picker-current-graphic"
+                aria-hidden="true"
+                dangerouslySetInnerHTML={{ __html: poiIconSvg(selectedIcon) }}
+              />
+              <span>{selectedIcon.label}</span>
+            </span>
+            <span className="poi-icon-picker-chevron" aria-hidden="true">
+              {poiIconPickerOpen ? '▴' : '▾'}
+            </span>
+          </button>
+          {poiIconPickerOpen && (
+            <div className="poi-icon-picker-options" id={`poi-icon-picker-options-${point.id}`}>
+              {POI_ICON_CATEGORIES.map((category) => (
+                <fieldset className="poi-icon-category" key={category.id}>
+                  <legend>{category.label}</legend>
+                  <div className="poi-icon-options">
+                    {category.icons.map((icon) => (
+                      <button
+                        className={`poi-icon-option ${point.icon === icon.id ? 'selected' : ''}`}
+                        key={icon.id}
+                        type="button"
+                        aria-label={icon.label}
+                        aria-pressed={point.icon === icon.id}
+                        onClick={() => updatePointDraft({ icon: icon.id as PoiIconId })}
+                      >
+                        <span
+                          aria-hidden="true"
+                          dangerouslySetInnerHTML={{ __html: poiIconSvg(icon) }}
+                        />
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
+          )}
+        </div>
+        <input
+          className="sidebar-route-input"
+          value={point.name}
+          onChange={(event) => updatePointDraft({ name: event.target.value })}
+          aria-label="POI-Titel"
+          placeholder="POI-Titel"
+        />
+        <textarea
+          className="sidebar-route-description"
+          value={point.description}
+          onChange={(event) =>
+            updatePointDraft({ description: event.target.value.slice(0, 180) })
+          }
+          aria-label="POI-Beschreibung"
+          placeholder="POI-Beschreibung"
+          maxLength={180}
+          rows={3}
+        />
+        <span className="route-description-length">{point.description.length}/180 Zeichen</span>
+        <div className="route-editor-actions">
+          {!isNew && (
+            <button
+              className="route-editor-action delete"
+              type="button"
+              onClick={confirmDeletePoint}
+              aria-label="POI löschen"
+              title="POI löschen"
+            >
+              × Löschen
+            </button>
+          )}
+          <button
+            className="route-editor-action save"
+            type="button"
+            onClick={savePointProperties}
+            aria-label="POI-Eigenschaften übernehmen"
+            title="Übernehmen"
+          >
+            ✓ Übernehmen
+          </button>
+          <button
+            className="route-editor-action cancel"
+            type="button"
+            onClick={() => setPointEditor(null)}
+            aria-label="POI-Eigenschaften verwerfen und schließen"
+            title="Abbrechen"
+          >
+            × Abbrechen
+          </button>
+        </div>
+      </section>
+    )
+  }
+
   const openMenuRoute = openRouteMenu
     ? project.routes.find((route) => route.id === openRouteMenu.routeId)
     : undefined
@@ -1874,6 +2095,14 @@ function App() {
               <>
                 <div className="route-editor-backdrop" aria-hidden="true" />
                 {renderRouteEditor(routeEditor.draft)}
+              </>,
+              document.body,
+            )}
+          {pointEditor &&
+            createPortal(
+              <>
+                <div className="route-editor-backdrop" aria-hidden="true" />
+                {renderPointEditor(pointEditor.draft)}
               </>,
               document.body,
             )}

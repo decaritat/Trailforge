@@ -45,6 +45,32 @@ describe('project normalization', () => {
     expect(project.routes[0].description).toHaveLength(180)
   })
 
+  it('adds a default icon to legacy points and preserves selected icons', () => {
+    const project = normalizeProject({
+      ...initialProject,
+      points: [
+        {
+          id: 'point-1',
+          name: 'Alter Punkt',
+          description: '',
+          coordinate: [13, 52],
+          source: 'manual',
+        },
+        {
+          id: 'point-2',
+          name: 'Gipfel',
+          description: '',
+          coordinate: [13.1, 52.1],
+          source: 'poi',
+          icon: 'summit',
+        },
+      ],
+    })
+
+    expect(project.points[0].icon).toBe('flag')
+    expect(project.points[1].icon).toBe('summit')
+  })
+
   it('rejects values that do not contain route and point arrays', () => {
     expect(() => normalizeProject(null)).toThrow('Ungültiges Projekt')
     expect(() => normalizeProject({ routes: {}, points: [] })).toThrow('Ungültiges Projekt')

@@ -74,7 +74,9 @@ once released versions are maintained.
 - Route waypoint editing, including selection, deletion, and insertion.
 - Elevation profile and route statistics for the active route.
 - GPX export, and saving and opening project files.
-- Independent map points and a zoom-dependent map scale.
+- Interactive map points and POIs with OSM-inspired SVG category symbols,
+  labeled white map markers, side-positioned property editing, editable titles
+  and descriptions, deletion, and a zoom-dependent map scale.
 - Tauri desktop shell based on React, TypeScript, and Vite.
 
 <!--

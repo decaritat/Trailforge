@@ -1,3 +1,5 @@
+import type { PoiIconId } from './poiIcons'
+
 export type RouteType = 'hiking' | 'cycling'
 export type DistanceMarkerMode = 'auto' | 'manual'
 export type Coordinate = [number, number]
@@ -41,6 +43,7 @@ export type MapPoint = {
   description: string
   coordinate: Coordinate
   source: 'manual' | 'poi'
+  icon?: PoiIconId
 }
 
 export type ProjectFile = {

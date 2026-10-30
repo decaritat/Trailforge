@@ -1,4 +1,5 @@
 import type { ProjectFile, Route } from './routeModel'
+import { defaultPoiIcon, isPoiIconId } from './poiIcons'
 
 const initialRoute: Route = {
   id: 'route-1',
@@ -52,6 +53,16 @@ export function normalizeProject(value: unknown): ProjectFile {
       typeof route.description === 'string'
         ? { ...route, description: route.description.slice(0, 180) }
         : route,
+    ),
+    points: value.points.map((point) =>
+      typeof point === 'object' &&
+      point !== null &&
+      'icon' in point &&
+      isPoiIconId(point.icon)
+        ? point
+        : typeof point === 'object' && point !== null
+          ? { ...point, icon: defaultPoiIcon }
+          : point,
     ),
     mapLayerId: supportedLayerId('mapLayerId' in value ? value.mapLayerId : undefined),
   } as ProjectFile
