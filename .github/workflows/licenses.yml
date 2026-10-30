@@ -25,9 +25,9 @@ jobs:
     name: Third-party notices and SBOM
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -69,7 +69,7 @@ jobs:
             --spec-version 1.5 --override-filename sbom-rust.cdx
           mv src-tauri/sbom-rust.cdx.json licenses/sbom-rust.cdx.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: licenses
           path: licenses/*
