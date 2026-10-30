@@ -108,6 +108,12 @@ select {
   font-size: 12px;
   letter-spacing: 0;
   text-transform: none;
+  color-scheme: dark;
+}
+
+select option {
+  color: var(--text);
+  background-color: var(--panel-raised);
 }
 
 select:focus,
@@ -627,18 +633,42 @@ textarea:focus {
   opacity: 0.55;
 }
 
-.sidebar-route-options {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.route-editor-section {
+  display: grid;
+  gap: 5px;
   margin-top: 8px;
 }
 
-.sidebar-route-options select {
-  flex: 1;
-  min-width: 0;
-  padding: 7px 9px;
+.route-editor-section-label {
+  color: var(--faint);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.route-editor-section select {
+  width: 100%;
+  padding: 5px 8px;
   font-size: 10px;
+  color: var(--text);
+  background-color: var(--panel-raised);
+  color-scheme: dark;
+}
+
+.route-editor-section select option {
+  color: var(--text);
+  background-color: var(--panel-raised);
+}
+
+.route-color-section {
+  gap: 5px;
+}
+
+.route-color-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
 }
 
 .sidebar-color-picker {
@@ -650,8 +680,8 @@ textarea:focus {
 }
 
 .sidebar-color-picker input {
-  width: 25px;
-  height: 25px;
+  width: 22px;
+  height: 22px;
   padding: 0;
   border: 1px solid var(--border);
   border-radius: 5px;
@@ -661,12 +691,12 @@ textarea:focus {
 .color-swatches {
   display: flex;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 0;
 }
 
 .color-swatch {
-  width: 19px;
-  height: 19px;
+  width: 17px;
+  height: 17px;
   padding: 0;
   border: 2px solid transparent;
   border-radius: 50%;
@@ -681,6 +711,154 @@ textarea:focus {
 .color-swatch:disabled {
   cursor: not-allowed;
   opacity: 0.5;
+}
+
+.distance-marker-settings {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.distance-marker-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.distance-marker-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+.distance-marker-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.distance-marker-switch {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 16px;
+  border-radius: 9px;
+  background: #56636a;
+  box-shadow: inset 0 0 0 1px rgba(13, 19, 24, 0.25);
+  transition: 140ms ease;
+}
+
+.distance-marker-switch::after {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #f3f8fa;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  content: '';
+  transition: 140ms ease;
+}
+
+.distance-marker-toggle input:checked + .distance-marker-switch {
+  background: var(--green);
+}
+
+.distance-marker-toggle input:checked + .distance-marker-switch::after {
+  left: 14px;
+  background: #10251a;
+}
+
+.distance-marker-toggle input:focus-visible + .distance-marker-switch {
+  outline: 2px solid rgba(126, 231, 135, 0.75);
+  outline-offset: 2px;
+}
+
+.distance-marker-toggle.disabled,
+.distance-marker-toggle input:disabled + .distance-marker-switch {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.distance-marker-info {
+  display: grid;
+  width: 14px;
+  height: 14px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--faint);
+  cursor: default;
+  font-size: 9px;
+  font-weight: 700;
+  user-select: none;
+}
+
+.distance-marker-options {
+  display: grid;
+  gap: 7px;
+  margin-left: 35px;
+}
+
+.distance-marker-options.disabled {
+  opacity: 0.5;
+}
+
+.distance-marker-option {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.distance-marker-option input[type='radio'] {
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--green);
+}
+
+.distance-marker-step-input {
+  width: 48px;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  color: var(--text);
+  background: var(--panel);
+  font: inherit;
+  text-align: center;
+}
+
+.distance-marker-step-input[aria-invalid='true'] {
+  border-color: #ff7b72;
+}
+
+.distance-marker-step-input::-webkit-inner-spin-button,
+.distance-marker-step-input::-webkit-outer-spin-button {
+  margin: 0;
+  appearance: none;
+}
+
+.distance-marker-step-input:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.field-error {
+  color: #ff9f98;
+  font-size: 9px;
+  line-height: 1.35;
 }
 
 .import-toggle {
@@ -921,13 +1099,39 @@ textarea:focus {
 }
 
 .route-node-wrapper,
-.point-marker-wrapper {
+.point-marker-wrapper,
+.distance-marker-wrapper {
   border: 0;
   background: transparent;
 }
 
 .route-node-wrapper {
   z-index: 500;
+}
+
+.distance-marker-wrapper {
+  pointer-events: none;
+}
+
+.distance-marker-label {
+  display: block;
+  width: max-content;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid rgba(17, 24, 32, 0.72);
+  border-radius: 999px;
+  color: #111820;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.24);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 14px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.distance-marker-wrapper:not(.active) .distance-marker-label {
+  opacity: 0.72;
 }
 
 .map-tools {

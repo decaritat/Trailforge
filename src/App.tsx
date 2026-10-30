@@ -34,11 +34,16 @@ import {
 import {
   formatDistanceAxis,
   formatDuration,
+  getAutomaticDistanceMarkerStepKm,
+  getDistanceMarkers,
   getDistanceScale,
   getElevationScale,
+  isValidDistanceMarkerStepKm,
   profileDetailsAtFraction,
   routeMetrics,
   selectedRoutePointDetails,
+  DISTANCE_MARKER_MAX_STEP_KM,
+  DISTANCE_MARKER_MIN_STEP_KM,
   type ElevationScale,
 } from './routeMetrics'
 import { escapeXml, parseGpx, toGpx } from './gpx'
@@ -175,10 +180,26 @@ const layers: LayerDefinition[] = [
 ]
 
 const GEOCODING_ENDPOINT = 'https://nominatim.openstreetmap.org/search'
-const routeColors = ['#7ee787', '#ffb86c', '#72b7ff', '#d6a8ff', '#ff7b72', '#f2cc60']
+const routeColors = [
+  '#7ee787',
+  '#ffb86c',
+  '#72b7ff',
+  '#d6a8ff',
+  '#ff7b72',
+  '#f2cc60',
+  '#00c2a8',
+  '#a855f7',
+]
 const profileViewBox = { width: 560, height: 190, plotLeft: 42, plotRight: 10, plotTop: 12, plotBottom: 34 }
-const activeRouteLineWeight = 6
-const inactiveRouteLineWeight = 4
+const activeRouteLineWeight = 4
+const inactiveRouteLineWeight = 3
+const routeOutlineColor = '#111820'
+
+function getCustomRouteColor(route: Route) {
+  if (route.customColor) return route.customColor
+  if (route.color && !routeColors.includes(route.color)) return route.color
+  return undefined
+}
 
 function profileFractionFromPointer(clientX: number, bounds: DOMRect) {
   if (
@@ -232,6 +253,7 @@ function App() {
   const mapRef = useRef<L.Map | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
   const routeLayersRef = useRef<L.Polyline[]>([])
+  const distanceMarkersRef = useRef<L.Marker[]>([])
   const profileMarkerRef = useRef<L.CircleMarker | null>(null)
   const markersRef = useRef<L.Layer[]>([])
   const searchLayerRef = useRef<L.Layer | null>(null)
@@ -246,6 +268,7 @@ function App() {
   const [projectNameDraft, setProjectNameDraft] = useState('')
   const [projectDescriptionDraft, setProjectDescriptionDraft] = useState('')
   const [toolMode, setToolMode] = useState<ToolMode>('route')
+  const [mapScale, setMapScale] = useState({ zoom: 7, latitude: 51.1657 })
   const [importEditable, setImportEditable] = useState(false)
   const [elevationExpanded, setElevationExpanded] = useState(false)
   const [notice, setNotice] = useState('')
@@ -474,6 +497,10 @@ function App() {
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
     const map = L.map(mapContainer.current, { zoomControl: true }).setView([51.1657, 10.4515], 7)
+    const updateMapScale = () => {
+      setMapScale({ zoom: map.getZoom(), latitude: map.getCenter().lat })
+    }
+    map.on('zoomend moveend', updateMapScale)
     L.control
       .scale({ position: 'topright', metric: true, imperial: false, maxWidth: 120 })
       .addTo(map)
@@ -490,8 +517,10 @@ function App() {
     }
     northArrow.addTo(map)
     mapRef.current = map
+    updateMapScale()
     window.setTimeout(() => map.invalidateSize(), 0)
     return () => {
+      map.off('zoomend moveend', updateMapScale)
       profileMarkerRef.current?.remove()
       profileMarkerRef.current = null
       searchRequestRef.current?.abort()
@@ -500,6 +529,7 @@ function App() {
       searchLayerRef.current?.remove()
       searchLayerRef.current = null
       markersRef.current.forEach((marker) => marker.remove())
+      distanceMarkersRef.current.forEach((marker) => marker.remove())
       routeLayersRef.current.forEach((layer) => layer.remove())
       map.remove()
       mapRef.current = null
@@ -639,10 +669,22 @@ function App() {
     project.routes.forEach((route) => {
       const coordinates = getDisplayedRouteCoordinates(route).map(([lon, lat]) => [lat, lon] as L.LatLngExpression)
       if (coordinates.length < 2) return
+      const active = route.id === project.activeRouteId
+      const lineWeight = active ? activeRouteLineWeight : inactiveRouteLineWeight
+      const outline = L.polyline(coordinates, {
+        color: routeOutlineColor,
+        interactive: false,
+        lineCap: 'round',
+        lineJoin: 'round',
+        opacity: active ? 0.92 : 0.75,
+        weight: lineWeight + 2,
+      }).addTo(map)
       const line = L.polyline(coordinates, {
-        color: route.id === project.activeRouteId ? route.color ?? '#7ee787' : '#78909c',
-        weight: route.id === project.activeRouteId ? activeRouteLineWeight : inactiveRouteLineWeight,
-        opacity: route.id === project.activeRouteId ? 0.95 : 0.6,
+        color: active ? route.color ?? '#7ee787' : '#78909c',
+        lineCap: 'round',
+        lineJoin: 'round',
+        opacity: active ? 0.95 : 0.6,
+        weight: lineWeight,
       }).addTo(map)
       let cleanupDrag: (() => void) | null = null
       const onMouseDown = (event: L.LeafletMouseEvent) => {
@@ -711,7 +753,7 @@ function App() {
         insertNodeAtCoordinate(route.id, [event.latlng.lng, event.latlng.lat])
       })
       line.on('mousedown', onMouseDown)
-      routeLayersRef.current.push(line)
+      routeLayersRef.current.push(outline, line)
       dragCleanups.push(() => {
         cleanupDrag?.()
         line.off('mousedown', onMouseDown)
@@ -723,6 +765,45 @@ function App() {
       routeLayersRef.current = []
     }
   }, [insertNodeAtCoordinate, project.activeRouteId, project.routes, routePropertiesOpen, toolMode])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    distanceMarkersRef.current.forEach((marker) => marker.removeFrom(map))
+    distanceMarkersRef.current = []
+
+    project.routes.forEach((route) => {
+      if (!route.showDistanceMarkers) return
+      const mode = route.distanceMarkerMode === 'manual' ? 'manual' : 'auto'
+      const stepKm =
+        mode === 'manual'
+          ? route.distanceMarkerStepKm
+          : getAutomaticDistanceMarkerStepKm(mapScale.zoom, mapScale.latitude)
+      if (!isValidDistanceMarkerStepKm(stepKm)) return
+
+      getDistanceMarkers(route, stepKm).forEach(({ coordinate, distance }) => {
+        const label = `${formatDistanceAxis(distance)} km`
+        const marker = L.marker([coordinate[1], coordinate[0]], {
+          icon: L.divIcon({
+            className: `distance-marker-wrapper ${route.id === project.activeRouteId ? 'active' : ''}`,
+            html: `<span class="distance-marker-label">${label}</span>`,
+            iconAnchor: [28, 11],
+            iconSize: [56, 22],
+          }),
+          interactive: false,
+          keyboard: false,
+          title: label,
+          zIndexOffset: 500,
+        }).addTo(map)
+        distanceMarkersRef.current.push(marker)
+      })
+    })
+
+    return () => {
+      distanceMarkersRef.current.forEach((marker) => marker.removeFrom(map))
+      distanceMarkersRef.current = []
+    }
+  }, [mapScale, project.activeRouteId, project.routes])
 
   useEffect(() => {
     const map = mapRef.current
@@ -943,9 +1024,11 @@ function App() {
       name: `Neue ${project.routes.length + 1}. Route`,
       description: '',
       type: 'hiking',
-      color: '#7ee787',
       editable: true,
       nodes: [],
+      showDistanceMarkers: false,
+      distanceMarkerMode: 'auto',
+      distanceMarkerStepKm: 1,
     }
     setProject((current) => ({
       ...current,
@@ -1043,6 +1126,16 @@ function App() {
 
   function saveRouteProperties() {
     if (!routeEditor?.draft.editable) return
+    if (
+      routeEditor.draft.showDistanceMarkers &&
+      routeEditor.draft.distanceMarkerMode === 'manual' &&
+      !isValidDistanceMarkerStepKm(routeEditor.draft.distanceMarkerStepKm)
+    ) {
+      setNotice(
+        `Die manuelle Schrittweite muss zwischen ${DISTANCE_MARKER_MIN_STEP_KM} und ${DISTANCE_MARKER_MAX_STEP_KM} km liegen.`,
+      )
+      return
+    }
     setProject((current) => ({
       ...current,
       routes: current.routes.map((route) =>
@@ -1306,6 +1399,19 @@ function App() {
   }
 
   function renderRouteEditor(route: Route) {
+    const customColor = getCustomRouteColor(route)
+    const showDistanceMarkers = Boolean(route.showDistanceMarkers)
+    const distanceMarkerMode = route.distanceMarkerMode === 'manual' ? 'manual' : 'auto'
+    const manualDistanceMarkerInvalid =
+      showDistanceMarkers &&
+      distanceMarkerMode === 'manual' &&
+      !isValidDistanceMarkerStepKm(route.distanceMarkerStepKm)
+    const manualDistanceMarkerStep =
+      typeof route.distanceMarkerStepKm === 'number' &&
+      Number.isFinite(route.distanceMarkerStepKm)
+        ? route.distanceMarkerStepKm
+        : 1
+
     return (
       <section
         ref={routeEditorRef}
@@ -1342,8 +1448,12 @@ function App() {
           rows={3}
         />
         <span className="route-description-length">{route.description.length}/180 Zeichen</span>
-        <div className="sidebar-route-options">
+        <div className="route-editor-section">
+          <label className="route-editor-section-label" htmlFor={`route-type-${route.id}`}>
+            Routentyp
+          </label>
           <select
+            id={`route-type-${route.id}`}
             value={route.type}
             onChange={(event) => updateRouteDraft({ type: event.target.value as RouteType })}
             disabled={!route.editable}
@@ -1352,30 +1462,119 @@ function App() {
             <option value="hiking">Wandern</option>
             <option value="cycling">Radfahren</option>
           </select>
-          <label className="sidebar-color-picker" title="Eigene Routenfarbe">
-            <input
-              type="color"
-              value={route.color ?? '#7ee787'}
-              onChange={(event) => updateRouteDraft({ color: event.target.value })}
-              disabled={!route.editable}
-              aria-label="Eigene Routenfarbe"
-            />
-            <span>Eigene</span>
-          </label>
         </div>
-        <div className="color-swatches" aria-label="Schnellwahl Routenfarbe">
-          {routeColors.map((color) => (
-            <button
-              key={color}
-              type="button"
-              className={`color-swatch ${route.color === color ? 'selected' : ''}`}
-              style={{ backgroundColor: color }}
-              title={`Farbe ${color}`}
-              onClick={() => updateRouteDraft({ color })}
-              disabled={!route.editable}
-            />
-          ))}
+        <div className="route-editor-section route-color-section">
+          <span className="route-editor-section-label">Routenfarbe</span>
+          <div className="route-color-controls">
+            <div className="color-swatches" aria-label="Schnellwahl Routenfarbe">
+              {routeColors.map((color) => (
+                <button
+                  key={color}
+                  type="button"
+                  className={`color-swatch ${route.color === color ? 'selected' : ''}`}
+                  style={{ backgroundColor: color }}
+                  title={`Farbe ${color}`}
+                  onClick={() => updateRouteDraft({ color, customColor })}
+                  disabled={!route.editable}
+                />
+              ))}
+            </div>
+            <label className="sidebar-color-picker" title="Eigene Routenfarbe">
+              <input
+                type="color"
+                value={customColor ?? '#000000'}
+                onChange={(event) =>
+                  updateRouteDraft({
+                    color: event.target.value,
+                    customColor: event.target.value,
+                  })
+                }
+                disabled={!route.editable}
+                aria-label="Eigene Routenfarbe"
+              />
+              <span>Eigene Farbe</span>
+            </label>
+          </div>
         </div>
+        <fieldset className="distance-marker-settings">
+          <legend className="distance-marker-heading">
+            <label className={`distance-marker-toggle ${route.editable ? '' : 'disabled'}`}>
+              <input
+                type="checkbox"
+                checked={showDistanceMarkers}
+                onChange={(event) =>
+                  updateRouteDraft({ showDistanceMarkers: event.target.checked })
+                }
+                disabled={!route.editable}
+              />
+              <span className="distance-marker-switch" aria-hidden="true" />
+              <span>Abstandsmarker</span>
+            </label>
+            <span
+              className="distance-marker-info"
+              role="img"
+              aria-label="Informationen zu Abstandsmarkern"
+              title="Zeigt Kilometerangaben entlang der Route an."
+            >
+              i
+            </span>
+          </legend>
+          <div className={`distance-marker-options ${showDistanceMarkers ? '' : 'disabled'}`}>
+            <label className="distance-marker-option">
+              <input
+                type="radio"
+                name={`distance-marker-mode-${route.id}`}
+                value="auto"
+                checked={distanceMarkerMode === 'auto'}
+                onChange={() => updateRouteDraft({ distanceMarkerMode: 'auto' })}
+                disabled={!route.editable || !showDistanceMarkers}
+              />
+              <span>Anpassung an den Kartenmaßstab</span>
+            </label>
+            <label className="distance-marker-option">
+              <input
+                type="radio"
+                name={`distance-marker-mode-${route.id}`}
+                value="manual"
+                checked={distanceMarkerMode === 'manual'}
+                onChange={() =>
+                  updateRouteDraft({
+                    distanceMarkerMode: 'manual',
+                    distanceMarkerStepKm: isValidDistanceMarkerStepKm(route.distanceMarkerStepKm)
+                      ? route.distanceMarkerStepKm
+                      : 1,
+                  })
+                }
+                disabled={!route.editable || !showDistanceMarkers}
+              />
+              <span>Anzeigen in Schritten von</span>
+              <input
+                className="distance-marker-step-input"
+                type="number"
+                min={DISTANCE_MARKER_MIN_STEP_KM}
+                max={DISTANCE_MARKER_MAX_STEP_KM}
+                step="0.1"
+                value={manualDistanceMarkerStep}
+                onChange={(event) =>
+                  updateRouteDraft({
+                    distanceMarkerStepKm:
+                      event.target.value === '' ? undefined : Number(event.target.value),
+                  })
+                }
+                disabled={!route.editable || !showDistanceMarkers || distanceMarkerMode !== 'manual'}
+                aria-invalid={manualDistanceMarkerInvalid}
+                aria-label="Manuelle Schrittweite in Kilometern"
+              />
+              <span>km</span>
+            </label>
+            {manualDistanceMarkerInvalid && (
+              <span className="field-error" role="alert">
+                Wert zwischen {DISTANCE_MARKER_MIN_STEP_KM} und {DISTANCE_MARKER_MAX_STEP_KM} km
+                eingeben.
+              </span>
+            )}
+          </div>
+        </fieldset>
         <div className="route-editor-actions">
           <button
             className="route-editor-action save"
