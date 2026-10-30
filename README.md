@@ -50,9 +50,11 @@ builds require them.
 
 Pushing a tag starting with `v` runs `.github/workflows/release.yml`. It
 builds a Windows NSIS installer (`.exe`) and a Linux AppImage (on Ubuntu 22.04
-for broad glibc compatibility). The tag must match the versions in
-`package.json`, `src-tauri/tauri.conf.json`, and `src-tauri/Cargo.toml`
-(without the pre-release suffix); otherwise the workflow fails before building.
+for broad glibc compatibility). The tag is the single source of truth for the
+version: the workflow writes it into `package.json` and `src-tauri/Cargo.toml`
+and the bundle configuration during the build, so the versions committed in the
+repository are placeholders and need no manual update. Development builds show
+`-dev` after the version in the About dialog.
 Nothing is published unless both builds succeed.
 
 - Final tag, e.g. `v0.2.0`: creates a **draft** GitHub Release with both
