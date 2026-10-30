@@ -10,6 +10,13 @@ export function formatAppVersion(baseVersion: string, releaseVersion?: string) {
 
 export async function getAppVersion() {
   const releaseVersion = import.meta.env.VITE_APP_VERSION as string | undefined
-  const baseVersion = isTauri() ? await getVersion() : packageVersion
+  let baseVersion = packageVersion
+  if (isTauri()) {
+    // Embedded webviews that merely expose Tauri globals reject the command.
+    baseVersion = await getVersion().catch((error) => {
+      console.warn('Tauri-Version nicht verfügbar, verwende package.json', error)
+      return packageVersion
+    })
+  }
   return formatAppVersion(baseVersion, releaseVersion)
 }
