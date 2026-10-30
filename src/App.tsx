@@ -13,6 +13,7 @@ import L from 'leaflet'
 import type { GeoJsonObject } from 'geojson'
 import 'leaflet/dist/leaflet.css'
 import './App.css'
+import AboutDialog from './AboutDialog'
 import {
   requestRouteGeometry,
   ROUTING_PROVIDER,
@@ -207,6 +208,7 @@ function App() {
   const [importEditable, setImportEditable] = useState(false)
   const [elevationExpanded, setElevationExpanded] = useState(false)
   const [notice, setNotice] = useState('')
+  const [aboutOpen, setAboutOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [searchResults, setSearchResults] = useState<PlaceSearchResult[]>([])
@@ -1272,7 +1274,7 @@ function App() {
   return (
     <div
       className="app-shell"
-      inert={routePropertiesOpen}
+      inert={routePropertiesOpen || aboutOpen}
       onClick={() => contextMenu && setContextMenu(null)}
     >
       <header className="topbar">
@@ -1313,6 +1315,9 @@ function App() {
           </button>
           <button className="solid-button" onClick={saveProject}>
             Projekt speichern
+          </button>
+          <button className="ghost-button" onClick={() => setAboutOpen(true)}>
+            Info
           </button>
           <input
             ref={projectInput}
@@ -2063,6 +2068,7 @@ function App() {
         <span>Trailforge · Open Source Route Planner</span>
         <span>© OpenStreetMap contributors · Provider-Attribution beachten</span>
       </footer>
+      {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
     </div>
   )
 }

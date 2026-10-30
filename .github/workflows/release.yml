@@ -10,16 +10,16 @@ permissions:
 
 jobs:
   prepare:
-    name: Validate tag and versions
+    name: Validate tag
     runs-on: ubuntu-22.04
     outputs:
       version: ${{ steps.parse.outputs.version }}
       prerelease: ${{ steps.parse.outputs.prerelease }}
       ocitag: ${{ steps.parse.outputs.ocitag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - name: Parse tag and compare with project versions
+      - name: Parse tag
         id: parse
         run: |
           tag="${GITHUB_REF_NAME}"
@@ -42,16 +42,6 @@ jobs:
 
           # OCI tags allow only [A-Za-z0-9_.-], up to 128 characters.
           ocitag=$(printf '%s' "${tag}" | tr -c 'A-Za-z0-9_.-' '-' | cut -c1-128)
-
-          pkg=$(node -p "require('./package.json').version")
-          tauri=$(node -p "require('./src-tauri/tauri.conf.json').version")
-          cargo=$(sed -n 's/^version = "\(.*\)"/\1/p' src-tauri/Cargo.toml | head -n1)
-          for entry in "package.json=$pkg" "src-tauri/tauri.conf.json=$tauri" "src-tauri/Cargo.toml=$cargo"; do
-            if [[ "${entry#*=}" != "$core" ]]; then
-              echo "::error::${entry%%=*} has version ${entry#*=}, but tag $tag requires $core"
-              exit 1
-            fi
-          done
 
           if [[ "$prerelease" == false ]]; then
             .github/scripts/changelog-notes.sh "$core" > /dev/null
@@ -85,9 +75,9 @@ jobs:
             glob: src-tauri/target/release/bundle/appimage/*.AppImage
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -105,17 +95,35 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev \
             libayatana-appindicator3-dev librsvg2-dev libssl-dev patchelf xdg-utils
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: licenses
           path: licenses
 
+      # The Git tag is the single source of truth for the version; the versions
+      # committed in the repository are placeholders.
+      - name: Set version from tag
+        shell: bash
+        run: |
+          version="${{ needs.prepare.outputs.version }}"
+          npm version "$version" --no-git-tag-version --allow-same-version
+          sed -i '0,/^version = ".*"/s//version = "'"$version"'"/' src-tauri/Cargo.toml
+          grep -m1 '^version' src-tauri/Cargo.toml
+
       - run: npm ci
+      - name: Provide third-party list for the About dialog
+        shell: bash
+        run: |
+          mkdir -p src/generated
+          cp licenses/third-party.json src/generated/third-party.json
       - run: npm run lint
       - run: npm test
 
       - name: Build bundle
         shell: bash
+        env:
+          TRAILFORGE_KEEP_NOTICES: "1"
+          VITE_APP_VERSION: ${{ needs.prepare.outputs.version }}
         run: >-
           npx tauri build --bundles ${{ matrix.bundle }}
           --config '{"version":"${{ needs.prepare.outputs.version }}","bundle":{"resources":{"../LICENSE":"LICENSE","../licenses/THIRD-PARTY-NOTICES.md":"THIRD-PARTY-NOTICES.md"}}}'
@@ -132,7 +140,7 @@ jobs:
           fi
           cp "${files[0]}" dist-release/
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: installer-${{ matrix.bundle }}
           path: dist-release/*
@@ -148,15 +156,15 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: assets
           pattern: installer-*
           merge-multiple: true
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: licenses
           path: assets
@@ -182,18 +190,18 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: assets
           pattern: installer-*
           merge-multiple: true
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: licenses
           path: assets
 
-      - uses: oras-project/setup-oras@v1
+      - uses: oras-project/setup-oras@v2
 
       - name: Push to GHCR
         env:

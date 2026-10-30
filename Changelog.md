@@ -10,6 +10,13 @@ once released versions are maintained.
 
 ### Added
 
+- Added an About dialog (Info button) showing the Trailforge version, links to
+  the GitHub project, documentation, changelog, and license, data and service
+  attributions (OpenStreetMap, OpenTopoMap, Nominatim, BRouter, Leaflet), and a
+  filterable list of npm and Rust third-party components with their license
+  texts. External links open in the system browser in the desktop app. The
+  version comes from the Git tag in release builds and is marked `-dev`
+  otherwise.
 - Added a CI workflow that runs lint, unit tests, the web build, and a Tauri
   build without installer on Linux and Windows for every pull request and push
   to `main`.
@@ -17,7 +24,7 @@ once released versions are maintained.
   CycloneDX SBOMs for npm and Rust dependencies, fails on unknown or
   disallowed licenses, and ships the notices with installers and releases.
 - Added a tag-triggered release workflow that builds a Windows NSIS installer
-  and a Linux AppImage and verifies the tag against the project versions. Final
+  and a Linux AppImage and takes the version from the tag. Final
   `vX.Y.Z` tags create a draft GitHub Release whose notes come from the matching
   `Changelog.md` section; any `vX.Y.Z-<suffix>` tag is published to GitHub
   Packages only.
