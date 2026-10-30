@@ -727,6 +727,16 @@ textarea:focus {
   box-shadow: 0 0 10px var(--green);
 }
 
+.status-dot.loading {
+  background: var(--orange);
+  box-shadow: 0 0 10px var(--orange);
+}
+
+.status-dot.error {
+  background: #ff7b72;
+  box-shadow: 0 0 10px #ff7b72;
+}
+
 .status-info {
   display: grid;
   place-items: center;
@@ -1102,6 +1112,77 @@ textarea:focus {
   line-height: 1.4;
 }
 
+.status-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1100;
+  display: flex;
+  width: min(360px, calc(100% - 44px));
+  transform: translate(-50%, -50%);
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid rgba(255, 123, 114, 0.55);
+  border-radius: 9px;
+  color: var(--text);
+  background: rgba(13, 19, 24, 0.94);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(10px);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.status-banner-close {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  display: inline-flex;
+  width: 24px;
+  height: 24px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.status-banner-close:hover,
+.status-banner-close:focus-visible {
+  border-color: rgba(255, 123, 114, 0.55);
+  color: #ffd3cf;
+  background: rgba(255, 123, 114, 0.12);
+}
+
+.status-banner strong {
+  color: #ffb8b2;
+}
+
+.status-banner span {
+  color: var(--muted);
+}
+
+.status-banner-action {
+  align-self: center;
+  padding: 6px 10px;
+  border: 1px solid rgba(255, 123, 114, 0.55);
+  border-radius: 6px;
+  color: #ffd3cf;
+  background: rgba(255, 123, 114, 0.12);
+  font-size: 11px;
+}
+
+.status-banner-action:hover,
+.status-banner-action:focus-visible {
+  border-color: #ff7b72;
+  background: rgba(255, 123, 114, 0.22);
+}
+
 .context-menu {
   position: fixed;
   z-index: 1200;
@@ -1277,6 +1358,10 @@ textarea:focus {
   margin-bottom: 3px;
   color: var(--green);
   font-size: 10px;
+}
+
+.inspector-route-status.error {
+  color: #ffb8b2;
 }
 
 .route-name-input:focus {

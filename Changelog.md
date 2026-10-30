@@ -50,6 +50,9 @@ once released versions are maintained.
 - Added routing provider BRouter. Hiking routes use `hiking-beta` and cycling
   routes use `trekking`; BRouter GeoJSON geometry is normalized before it is 
   displayed.
+- Added consistent error-banner handling for unavailable map layers and
+  routing failures, with provider-specific BRouter messages, retry actions,
+  a close button, and the existing direct route fallback.
 - Added a unified Trailforge route-and-mountain app icon for the application
   header, browser favicon, and Tauri platform icons.
 - Added a manually submitted place search beside the map toolbar, with an

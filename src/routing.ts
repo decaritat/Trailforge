@@ -5,6 +5,30 @@ export type RouteGeometry = {
   coordinates: Coordinate[]
   elevations?: number[]
 }
+export type RoutingErrorKind =
+  | 'network'
+  | 'rate-limit'
+  | 'authentication'
+  | 'provider'
+  | 'request'
+  | 'invalid-response'
+  | 'no-route'
+
+export class RoutingError extends Error {
+  readonly kind: RoutingErrorKind
+  readonly status?: number
+
+  constructor(
+    kind: RoutingErrorKind,
+    message: string,
+    status?: number,
+  ) {
+    super(message)
+    this.kind = kind
+    this.status = status
+    this.name = 'RoutingError'
+  }
+}
 
 export const ROUTING_PROVIDER = {
   id: 'brouter',
@@ -35,6 +59,36 @@ export function routingProfileLabel(routeType: RouteType) {
     : 'Radfahren (trekking)'
 }
 
+function httpErrorKind(status: number): RoutingErrorKind {
+  if (status === 401 || status === 403) return 'authentication'
+  if (status === 429) return 'rate-limit'
+  if (status >= 500) return 'provider'
+  return 'request'
+}
+
+function httpErrorMessage(status: number, detail: string) {
+  const suffix = detail ? `: ${detail.slice(0, 160)}` : ''
+  if (status === 401 || status === 403) {
+    return `${ROUTING_PROVIDER.label} verweigert die Anfrage (HTTP ${status})${suffix}`
+  }
+  if (status === 429) {
+    return `${ROUTING_PROVIDER.label} meldet ein Rate-Limit (HTTP 429). Bitte später erneut versuchen${suffix}`
+  }
+  if (status >= 500) {
+    return `${ROUTING_PROVIDER.label} ist vorübergehend nicht verfügbar (HTTP ${status})${suffix}`
+  }
+  return `${ROUTING_PROVIDER.label} meldet einen Anfragefehler (HTTP ${status})${suffix}`
+}
+
+export function describeRoutingError(error: unknown) {
+  if (error instanceof RoutingError) return error.message
+  if (error instanceof TypeError) {
+    return `${ROUTING_PROVIDER.label} ist nicht erreichbar. Prüfe die Internetverbindung.`
+  }
+  if (error instanceof Error) return error.message
+  return 'Unbekannter Fehler beim Routing.'
+}
+
 export async function requestRouteGeometry(
   routeType: RouteType,
   coordinates: readonly Coordinate[],
@@ -48,14 +102,25 @@ export async function requestRouteGeometry(
     alternativeidx: '0',
     format: 'geojson',
   })
-  const response = await fetch(`${ROUTING_PROVIDER.endpoint}?${params.toString()}`, {
-    signal,
-  })
+  let response: Response
+  try {
+    response = await fetch(`${ROUTING_PROVIDER.endpoint}?${params.toString()}`, {
+      signal,
+    })
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error
+    throw new RoutingError(
+      'network',
+      describeRoutingError(error),
+    )
+  }
 
   if (!response.ok) {
     const message = (await response.text()).trim()
-    throw new Error(
-      `${ROUTING_PROVIDER.label} HTTP ${response.status}${message ? `: ${message.slice(0, 160)}` : ''}`,
+    throw new RoutingError(
+      httpErrorKind(response.status),
+      httpErrorMessage(response.status, message),
+      response.status,
     )
   }
 
@@ -63,20 +128,29 @@ export async function requestRouteGeometry(
   try {
     payload = (await response.json()) as BRouterResponse
   } catch {
-    throw new Error('BRouter hat keine gültige Routingantwort geliefert')
+    throw new RoutingError(
+      'invalid-response',
+      `${ROUTING_PROVIDER.label} hat keine gültige Routingantwort geliefert.`,
+    )
   }
 
   const rawCoordinates = payload.features?.[0]?.geometry?.coordinates
   const validCoordinates = rawCoordinates
     ?.filter(
-      (coordinate) =>
+      (coordinate): coordinate is number[] =>
+        Array.isArray(coordinate) &&
         Number.isFinite(coordinate[0]) && Number.isFinite(coordinate[1]),
     )
   const geometry = validCoordinates?.map(
     ([longitude, latitude]) => [longitude, latitude] as Coordinate,
   )
 
-  if (!geometry?.length) throw new Error('BRouter hat keine Route gefunden')
+  if (!geometry?.length) {
+    throw new RoutingError(
+      'no-route',
+      `${ROUTING_PROVIDER.label} konnte für diese Punkte keine Route finden.`,
+    )
+  }
   const elevations = validCoordinates?.map((coordinate) => coordinate[2])
   return {
     coordinates: geometry,

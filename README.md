@@ -10,7 +10,11 @@ Trailforge is intended to run on Windows 11 and Linux. The desktop application i
 - Manually triggered place search for towns, landmarks, and other locations, with map highlighting
 - Multiple independently editable hiking and cycling routes
 - Routing through BRouter with separate hiking-beta and trekking profiles and a
-  direct fallback when the provider fails
+  direct fallback when the provider fails; routing failures are shown per route
+  with provider-specific messages, a retry action, and a dismissible error
+  banner
+- Visible map-layer errors with a consistent retry banner when tile providers
+  are unavailable; the banner can be dismissed with its close button
 - Route waypoints created by clicking, deleted through the context menu or Delete key, and inserted by dragging onto the route
 - Route name, description, type, and color
 - Elevation profile with distance, elevation, and time information

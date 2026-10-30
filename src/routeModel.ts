@@ -17,6 +17,7 @@ export type Route = {
   geometry?: Coordinate[]
   elevations?: number[]
   routingState?: 'idle' | 'loading' | 'ready' | 'fallback'
+  routingError?: string
 }
 
 export type ProfilePointDetails = {

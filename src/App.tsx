@@ -15,6 +15,7 @@ import 'leaflet/dist/leaflet.css'
 import './App.css'
 import AboutDialog from './AboutDialog'
 import {
+  describeRoutingError,
   requestRouteGeometry,
   ROUTING_PROVIDER,
   routingProfileLabel,
@@ -45,6 +46,45 @@ import { normalizeProject, readInitialProject } from './project'
 
 type ToolMode = 'pan' | 'route' | 'point'
 type MapToolIconName = 'search' | 'pan' | 'route' | 'point' | 'focus'
+type ErrorBanner = {
+  title: string
+  message: string
+  action: 'map-retry' | 'routing-retry'
+  routeId?: string
+}
+
+function StatusBanner({
+  title,
+  message,
+  actionLabel,
+  onAction,
+  onClose,
+}: {
+  title: string
+  message: string
+  actionLabel: string
+  onAction: () => void
+  onClose: () => void
+}) {
+  return (
+    <div className="status-banner" role="alert">
+      <button
+        type="button"
+        className="status-banner-close"
+        aria-label="Fehlermeldung schließen"
+        title="Fehlermeldung schließen"
+        onClick={onClose}
+      >
+        ×
+      </button>
+      <strong>{title}</strong>
+      <span>{message}</span>
+      <button type="button" className="status-banner-action" onClick={onAction}>
+        {actionLabel}
+      </button>
+    </div>
+  )
+}
 
 function MapToolIcon({ name }: { name: MapToolIconName }) {
   if (name === 'search') {
@@ -200,6 +240,7 @@ function App() {
   const searchCacheRef = useRef(new Map<string, PlaceSearchResult[]>())
   const suppressNextRouteClickRef = useRef(false)
   const routedSignatureRef = useRef('')
+  const routedRetryRef = useRef(0)
   const [project, setProject] = useState<ProjectFile>(readInitialProject)
   const [editingProjectName, setEditingProjectName] = useState(false)
   const [projectNameDraft, setProjectNameDraft] = useState('')
@@ -208,6 +249,9 @@ function App() {
   const [importEditable, setImportEditable] = useState(false)
   const [elevationExpanded, setElevationExpanded] = useState(false)
   const [notice, setNotice] = useState('')
+  const [errorBanner, setErrorBanner] = useState<ErrorBanner | null>(null)
+  const [mapLayerRetry, setMapLayerRetry] = useState(0)
+  const [routingRetry, setRoutingRetry] = useState(0)
   const [aboutOpen, setAboutOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -351,6 +395,7 @@ function App() {
               geometry: undefined,
               elevations: undefined,
               routingState: 'idle',
+              routingError: undefined,
             }
           : route,
       ),
@@ -373,6 +418,7 @@ function App() {
             geometry: undefined,
             elevations: undefined,
             routingState: 'idle',
+            routingError: undefined,
           }
         }
 
@@ -418,6 +464,7 @@ function App() {
           geometry: undefined,
           elevations: undefined,
           routingState: 'idle',
+          routingError: undefined,
         }
       }),
     }))
@@ -427,10 +474,6 @@ function App() {
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
     const map = L.map(mapContainer.current, { zoomControl: true }).setView([51.1657, 10.4515], 7)
-    const tileLayer = L.tileLayer(layers[0].tiles, {
-      attribution: layers[0].attribution,
-      maxZoom: 19,
-    }).addTo(map)
     L.control
       .scale({ position: 'topright', metric: true, imperial: false, maxWidth: 120 })
       .addTo(map)
@@ -446,13 +489,14 @@ function App() {
       return container
     }
     northArrow.addTo(map)
-    tileLayerRef.current = tileLayer
     mapRef.current = map
     window.setTimeout(() => map.invalidateSize(), 0)
     return () => {
       profileMarkerRef.current?.remove()
       profileMarkerRef.current = null
       searchRequestRef.current?.abort()
+      tileLayerRef.current?.remove()
+      tileLayerRef.current = null
       searchLayerRef.current?.remove()
       searchLayerRef.current = null
       markersRef.current.forEach((marker) => marker.remove())
@@ -463,8 +507,12 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (routedSignatureRef.current === routeNodeSignature) return
+    if (
+      routedSignatureRef.current === routeNodeSignature &&
+      routedRetryRef.current === routingRetry
+    ) return
     routedSignatureRef.current = routeNodeSignature
+    routedRetryRef.current = routingRetry
     const abortController = new AbortController()
     const candidates = project.routes.filter(
       (route) =>
@@ -484,13 +532,25 @@ function App() {
             id: route.id,
             ...routeGeometry,
             routingState: 'ready' as const,
+            routingError: undefined,
           }
-        } catch {
+        } catch (error) {
+          if (abortController.signal.aborted) {
+            return {
+              id: route.id,
+              coordinates: getRouteCoordinates(route),
+              elevations: undefined,
+              routingState: 'fallback' as const,
+              routingError: undefined,
+            }
+          }
+          const message = describeRoutingError(error)
           return {
             id: route.id,
             coordinates: getRouteCoordinates(route),
             elevations: undefined,
             routingState: 'fallback' as const,
+            routingError: message,
           }
         }
       }),
@@ -506,20 +566,32 @@ function App() {
                 geometry: result.coordinates,
                 elevations: result.elevations,
                 routingState: result.routingState,
+                routingError: result.routingError,
               }
             : route
         }),
       }))
       const fallbackUsed = results.some((result) => result.routingState === 'fallback')
-      setNotice(
-        fallbackUsed
-          ? 'Routingdienst nicht erreichbar; die direkte Verbindung bleibt als Fallback sichtbar.'
-          : `Route über ${ROUTING_PROVIDER.label} berechnet.`,
+      const fallbackResult = results.find(
+        (result) => result.routingState === 'fallback' && result.routingError,
       )
+      if (fallbackUsed && fallbackResult?.routingError) {
+        setErrorBanner({
+          title: 'Routing fehlgeschlagen',
+          message: `${fallbackResult.routingError} Die direkte Verbindung bleibt als Fallback sichtbar.`,
+          action: 'routing-retry',
+          routeId: fallbackResult.id,
+        })
+      } else if (!fallbackUsed) {
+        setErrorBanner((current) =>
+          current?.action === 'routing-retry' ? null : current,
+        )
+        setNotice(`Route über ${ROUTING_PROVIDER.label} berechnet.`)
+      }
     })
 
     return () => abortController.abort()
-  }, [project.routes, routeNodeSignature])
+  }, [project.routes, routeNodeSignature, routingRetry])
 
   useEffect(() => {
     const map = mapRef.current
@@ -528,12 +600,35 @@ function App() {
     if (layer.requiresKey) {
       return
     }
-    tileLayerRef.current?.removeFrom(map)
-    tileLayerRef.current = L.tileLayer(layer.tiles, {
+    const tileLayer = L.tileLayer(layer.tiles, {
       attribution: layer.attribution,
       maxZoom: 19,
-    }).addTo(map)
-  }, [layerId])
+    })
+    const onTileError = () => {
+      if (tileLayerRef.current === tileLayer) {
+        setErrorBanner({
+          title: 'Kartenlayer nicht erreichbar',
+          message: `${layer.label} konnte keine Kartenkacheln laden. Prüfe die Internetverbindung oder wähle einen anderen Kartenlayer.`,
+          action: 'map-retry',
+        })
+      }
+    }
+    const onTileLoad = () => {
+      setErrorBanner((current) =>
+        current?.action === 'map-retry' ? null : current,
+      )
+    }
+    tileLayer.on('tileerror', onTileError)
+    tileLayer.on('load', onTileLoad)
+    tileLayerRef.current = tileLayer
+    tileLayer.addTo(map)
+    return () => {
+      tileLayer.off('tileerror', onTileError)
+      tileLayer.off('load', onTileLoad)
+      tileLayer.removeFrom(map)
+      if (tileLayerRef.current === tileLayer) tileLayerRef.current = null
+    }
+  }, [layerId, mapLayerRetry])
 
   useEffect(() => {
     const map = mapRef.current
@@ -778,6 +873,7 @@ function App() {
                 geometry: undefined,
                 elevations: undefined,
                 routingState: 'idle',
+                routingError: undefined,
               }
             : route,
         ),
@@ -812,6 +908,7 @@ function App() {
               geometry: undefined,
               elevations: undefined,
               routingState: 'idle',
+              routingError: undefined,
             }
           : route,
       ),
@@ -954,7 +1051,12 @@ function App() {
               ...route,
               ...routeEditor.draft,
               ...(route.type !== routeEditor.draft.type
-                ? { geometry: undefined, elevations: undefined, routingState: 'idle' as const }
+                ? {
+                    geometry: undefined,
+                    elevations: undefined,
+                    routingState: 'idle' as const,
+                    routingError: undefined,
+                  }
                 : {}),
             }
           : route,
@@ -1039,6 +1141,38 @@ function App() {
     } else if (coordinates.length === 1) {
       mapRef.current?.setView([coordinates[0][1], coordinates[0][0]], 13, { animate: true })
     }
+  }
+
+  function retryRouting(route: Route) {
+    if (!route.editable || route.nodes.length < 2) return
+    setProject((current) => ({
+      ...current,
+      routes: current.routes.map((item) =>
+        item.id === route.id
+          ? { ...item, routingState: 'idle', routingError: undefined }
+          : item,
+      ),
+    }))
+    setRoutingRetry((value) => value + 1)
+    setErrorBanner((current) =>
+      current?.action === 'routing-retry' && current.routeId === route.id
+        ? null
+        : current,
+    )
+    setNotice(`${ROUTING_PROVIDER.label} wird erneut versucht.`)
+  }
+
+  function retryMapLayer() {
+    setErrorBanner((current) =>
+      current?.action === 'map-retry' ? null : current,
+    )
+    setMapLayerRetry((value) => value + 1)
+  }
+
+  function clearMapError() {
+    setErrorBanner((current) =>
+      current?.action === 'map-retry' ? null : current,
+    )
   }
 
   async function searchPlaces(event: FormEvent<HTMLFormElement>) {
@@ -1298,6 +1432,7 @@ function App() {
                   setNotice('Tracestrack benötigt einen API-Key. OSM Carto bleibt aktiv.')
                   return
                 }
+                clearMapError()
                 setLayerId(nextLayerId)
                 setProject((current) => ({ ...current, mapLayerId: nextLayerId }))
               }}
@@ -1566,8 +1701,22 @@ function App() {
               />
             </div>
             <div className="provider-status">
-              <span className="status-dot" />
-              <span>{ROUTING_PROVIDER.label} online</span>
+              <span
+                className={`status-dot ${
+                  project.routes.some((route) => route.routingState === 'fallback')
+                    ? 'error'
+                    : project.routes.some((route) => route.routingState === 'loading')
+                      ? 'loading'
+                      : ''
+                }`}
+              />
+              <span>
+                {project.routes.some((route) => route.routingState === 'fallback')
+                  ? `${ROUTING_PROVIDER.label} nicht erreichbar`
+                  : project.routes.some((route) => route.routingState === 'loading')
+                    ? `${ROUTING_PROVIDER.label} wird verwendet`
+                    : `${ROUTING_PROVIDER.label} bereit`}
+              </span>
               <span
                 className="status-info"
                 title={`Profile: ${routingProfileLabel('hiking')} · ${routingProfileLabel('cycling')}`}
@@ -1710,6 +1859,28 @@ function App() {
                 {notice}
               </div>
             )}
+            {errorBanner && (
+              <StatusBanner
+                title={errorBanner.title}
+                message={errorBanner.message}
+                actionLabel={
+                  errorBanner.action === 'map-retry'
+                    ? 'Kartenlayer erneut laden'
+                    : 'Routing erneut versuchen'
+                }
+                onAction={() => {
+                  if (errorBanner.action === 'map-retry') {
+                    retryMapLayer()
+                    return
+                  }
+                  const route = errorBanner.routeId
+                    ? project.routes.find((item) => item.id === errorBanner.routeId)
+                    : undefined
+                  if (route) retryRouting(route)
+                }}
+                onClose={() => setErrorBanner(null)}
+              />
+            )}
             {contextMenu && (
               <div
                 className="context-menu"
@@ -1752,12 +1923,22 @@ function App() {
                   <strong className="inspector-route-name">{activeRoute?.name ?? 'Keine Route'}</strong>
                 </div>
                 <div className="inspector-actions">
-                  <span className="inspector-route-status">
-                    {activeRoute?.routingState === 'loading'
-                      ? 'Route wird berechnet …'
-                      : activeRoute?.routingState === 'fallback'
-                        ? 'Direkter Fallback'
-                        : 'Routing aktiv'}
+                  <span
+                    className={`inspector-route-status ${
+                      activeRoute?.routingState === 'fallback' ? 'error' : ''
+                    }`}
+                  >
+                    {!activeRoute
+                      ? 'Keine aktive Route'
+                      : activeRoute.routingState === 'loading'
+                        ? 'Route wird berechnet …'
+                        : activeRoute.routingState === 'fallback'
+                          ? 'Direkter Fallback'
+                          : activeRoute.routingState === 'idle' || activeRoute.nodes.length < 2
+                            ? activeRoute.nodes.length < 2
+                              ? 'Mindestens zwei Punkte erforderlich'
+                              : 'Routing wird vorbereitet …'
+                            : 'Routing aktiv'}
                   </span>
                 </div>
               </div>

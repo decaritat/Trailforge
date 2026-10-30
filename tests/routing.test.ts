@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { requestRouteGeometry, routingProfileLabel } from '../src/routing'
+import {
+  requestRouteGeometry,
+  RoutingError,
+  routingProfileLabel,
+} from '../src/routing'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -71,7 +75,11 @@ describe('BRouter integration', () => {
     )
     await expect(
       requestRouteGeometry('cycling', [[13.4, 52.5], [13.5, 52.6]], new AbortController().signal),
-    ).rejects.toThrow('BRouter HTTP 503: provider down')
+    ).rejects.toMatchObject({
+      kind: 'provider',
+      message: 'BRouter ist vorübergehend nicht verfügbar (HTTP 503): provider down',
+      status: 503,
+    })
 
     vi.stubGlobal(
       'fetch',
@@ -85,5 +93,63 @@ describe('BRouter integration', () => {
     await expect(
       requestRouteGeometry('cycling', [[13.4, 52.5], [13.5, 52.6]], new AbortController().signal),
     ).rejects.toThrow('BRouter hat keine gültige Routingantwort geliefert')
+  })
+
+  it('classifies rate-limit and authentication responses', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn()
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 429,
+          text: async () => '',
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+          text: async () => 'blocked',
+        }),
+    )
+
+    await expect(
+      requestRouteGeometry('hiking', [[13.4, 52.5], [13.5, 52.6]], new AbortController().signal),
+    ).rejects.toMatchObject({
+      kind: 'rate-limit',
+      message: expect.stringContaining('Rate-Limit'),
+    })
+    await expect(
+      requestRouteGeometry('hiking', [[13.4, 52.5], [13.5, 52.6]], new AbortController().signal),
+    ).rejects.toMatchObject({
+      kind: 'authentication',
+      message: expect.stringContaining('verweigert'),
+    })
+  })
+
+  it('classifies network failures without hiding the provider context', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
+
+    await expect(
+      requestRouteGeometry('cycling', [[13.4, 52.5], [13.5, 52.6]], new AbortController().signal),
+    ).rejects.toMatchObject({
+      kind: 'network',
+      message: 'BRouter ist nicht erreichbar. Prüfe die Internetverbindung.',
+    })
+  })
+
+  it('returns typed no-route errors for empty provider geometry', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ features: [] }),
+      }),
+    )
+
+    await expect(
+      requestRouteGeometry('hiking', [[13.4, 52.5], [13.5, 52.6]], new AbortController().signal),
+    ).rejects.toBeInstanceOf(RoutingError)
+    await expect(
+      requestRouteGeometry('hiking', [[13.4, 52.5], [13.5, 52.6]], new AbortController().signal),
+    ).rejects.toMatchObject({ kind: 'no-route' })
   })
 })
