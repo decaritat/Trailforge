@@ -4,9 +4,93 @@ import {
   getCumulativeDistances,
   getDisplayedRouteCoordinates,
   getDisplayedRouteElevations,
+  type Coordinate,
   type ProfilePointDetails,
   type Route,
 } from './routeModel'
+
+export const DISTANCE_MARKER_MIN_STEP_KM = 0.1
+export const DISTANCE_MARKER_MAX_STEP_KM = 1000
+
+export type DistanceMarker = {
+  distance: number
+  coordinate: Coordinate
+}
+
+function roundedDistanceStep(distance: number) {
+  const safeDistance = Math.max(DISTANCE_MARKER_MIN_STEP_KM, distance)
+  const magnitude = 10 ** Math.floor(Math.log10(safeDistance))
+  const normalized = safeDistance / magnitude
+  const rounded =
+    (normalized <= 1.5 ? 1 : normalized <= 3 ? 2 : normalized <= 7 ? 5 : 10) * magnitude
+  return Number(Math.max(DISTANCE_MARKER_MIN_STEP_KM, rounded).toPrecision(6))
+}
+
+export function getAutomaticDistanceMarkerStepKm(zoom: number, latitude: number) {
+  const safeZoom = Number.isFinite(zoom) ? Math.min(24, Math.max(0, zoom)) : 7
+  const safeLatitude = Number.isFinite(latitude) ? Math.min(85, Math.max(-85, latitude)) : 0
+  const metersPerPixel =
+    (156543.03392 * Math.cos((safeLatitude * Math.PI) / 180)) / 2 ** safeZoom
+  return roundedDistanceStep((metersPerPixel * 120) / 1000)
+}
+
+export function isValidDistanceMarkerStepKm(value: unknown): value is number {
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= DISTANCE_MARKER_MIN_STEP_KM &&
+    value <= DISTANCE_MARKER_MAX_STEP_KM
+  )
+}
+
+function coordinateAtDistance(
+  coordinates: Coordinate[],
+  distances: number[],
+  targetDistance: number,
+): Coordinate {
+  if (targetDistance <= 0) return coordinates[0]
+  const totalDistance = distances.at(-1) ?? 0
+  if (targetDistance >= totalDistance) return coordinates.at(-1) ?? coordinates[0]
+
+  const upperIndex = distances.findIndex((distance, index) => index > 0 && distance >= targetDistance)
+  const index = upperIndex < 0 ? distances.length - 1 : upperIndex
+  const segmentStart = distances[index - 1]
+  const segmentEnd = distances[index]
+  const fraction =
+    segmentEnd > segmentStart
+      ? (targetDistance - segmentStart) / (segmentEnd - segmentStart)
+      : 0
+  const from = coordinates[index - 1]
+  const to = coordinates[index]
+  return [
+    from[0] + (to[0] - from[0]) * fraction,
+    from[1] + (to[1] - from[1]) * fraction,
+  ]
+}
+
+export function getDistanceMarkers(route: Route, stepKm: number): DistanceMarker[] {
+  if (!isValidDistanceMarkerStepKm(stepKm)) return []
+  const coordinates = getDisplayedRouteCoordinates(route)
+  if (coordinates.length < 2) return []
+  const distances = getCumulativeDistances(coordinates)
+  const totalDistance = distances.at(-1) ?? 0
+  if (!(totalDistance > 0)) return []
+
+  const markers: DistanceMarker[] = []
+  for (let distance = stepKm; distance < totalDistance; distance += stepKm) {
+    markers.push({
+      distance,
+      coordinate: coordinateAtDistance(coordinates, distances, distance),
+    })
+  }
+  if (!markers.length || totalDistance - (markers.at(-1)?.distance ?? 0) > 0.000001) {
+    markers.push({
+      distance: totalDistance,
+      coordinate: coordinateAtDistance(coordinates, distances, totalDistance),
+    })
+  }
+  return markers
+}
 
 export function profileDetailsAtIndex(
   route: Route,

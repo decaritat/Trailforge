@@ -55,6 +55,9 @@ once released versions are maintained.
   a close button, and the existing direct route fallback.
 - Added a unified Trailforge route-and-mountain app icon for the application
   header, browser favicon, and Tauri platform icons.
+- Added optional route outlines and zoom-aware distance markers with compact
+  map labels and configurable manual spacing persisted in project files.
+- New projects now start with one empty editable route ready for route-point entry.
 - Added a manually submitted place search beside the map toolbar, with an
   attributed result list, zoom-to-area behavior, temporary area outlines, and
   pins for point results.
@@ -66,7 +69,7 @@ once released versions are maintained.
   distance-based axis scaling, a clickable mini-profile opener, and an
   in-panel close button.
 - Support for separate hiking and cycling routes with a name, description,
-  color, and route type.
+  independent preset/custom colors, and route type.
 - Routing through the configured routing provider with a direct fallback.
 - Route waypoint editing, including selection, deletion, and insertion.
 - Elevation profile and route statistics for the active route.

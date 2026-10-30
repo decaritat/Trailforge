@@ -1,4 +1,5 @@
 export type RouteType = 'hiking' | 'cycling'
+export type DistanceMarkerMode = 'auto' | 'manual'
 export type Coordinate = [number, number]
 
 export type RouteNode = {
@@ -11,13 +12,17 @@ export type Route = {
   name: string
   description: string
   type: RouteType
-  color: string
+  color?: string
+  customColor?: string
   editable: boolean
   nodes: RouteNode[]
   geometry?: Coordinate[]
   elevations?: number[]
   routingState?: 'idle' | 'loading' | 'ready' | 'fallback'
   routingError?: string
+  showDistanceMarkers?: boolean
+  distanceMarkerMode?: DistanceMarkerMode
+  distanceMarkerStepKm?: number
 }
 
 export type ProfilePointDetails = {

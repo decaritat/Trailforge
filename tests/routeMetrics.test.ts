@@ -5,9 +5,12 @@ import {
   type Route,
 } from '../src/routeModel'
 import {
+  getAutomaticDistanceMarkerStepKm,
   formatDuration,
+  getDistanceMarkers,
   getDistanceScale,
   getElevationScale,
+  isValidDistanceMarkerStepKm,
   profileDetailsAtFraction,
   routeMetrics,
   selectedRoutePointDetails,
@@ -95,6 +98,23 @@ describe('route geometry and metrics', () => {
     expect(getDistanceScale(10).ticks.at(-1)).toBe(10)
     expect(getElevationScale([])).toEqual({ min: 0, max: 50, step: 50 })
     expect(getElevationScale([101, 249])).toEqual({ min: 100, max: 250, step: 50 })
+  })
+
+  it('creates distance markers at interpolated route positions', () => {
+    const markers = getDistanceMarkers(createRoute(), 1)
+
+    expect(markers.map((marker) => marker.distance)).toHaveLength(3)
+    expect(markers.map((marker) => marker.distance).slice(0, 2)).toEqual([1, 2])
+    expect(markers.at(-1)?.distance).toBeCloseTo(2.2239, 3)
+    expect(markers[0].coordinate[0]).toBeCloseTo(0.00899, 3)
+    expect(getDistanceMarkers(createRoute(), 0)).toEqual([])
+    expect(isValidDistanceMarkerStepKm(-1)).toBe(false)
+    expect(isValidDistanceMarkerStepKm(0.1)).toBe(true)
+  })
+
+  it('chooses a rounded automatic marker step from the map scale', () => {
+    expect(getAutomaticDistanceMarkerStepKm(7, 51)).toBe(100)
+    expect(getAutomaticDistanceMarkerStepKm(14, 51)).toBe(1)
   })
 
   it('formats route durations in minutes or hours', () => {

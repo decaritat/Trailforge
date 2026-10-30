@@ -2,6 +2,17 @@ import { describe, expect, it } from 'vitest'
 import { initialProject, normalizeProject, readInitialProject, supportedLayerId } from '../src/project'
 
 describe('project normalization', () => {
+  it('starts a new project with one empty editable route', () => {
+    expect(initialProject.routes).toHaveLength(1)
+    expect(initialProject.routes[0]).toMatchObject({
+      id: initialProject.activeRouteId,
+      type: 'hiking',
+      editable: true,
+      nodes: [],
+    })
+    expect(initialProject.routes[0].color).toBeUndefined()
+  })
+
   it('preserves project data and restores a supported map layer', () => {
     const project = {
       ...initialProject,

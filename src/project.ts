@@ -1,12 +1,24 @@
-import type { ProjectFile } from './routeModel'
+import type { ProjectFile, Route } from './routeModel'
+
+const initialRoute: Route = {
+  id: 'route-1',
+  name: 'Neue 1. Route',
+  description: '',
+  type: 'hiking',
+  editable: true,
+  nodes: [],
+  showDistanceMarkers: false,
+  distanceMarkerMode: 'auto',
+  distanceMarkerStepKm: 1,
+}
 
 export const initialProject: ProjectFile = {
   version: 1,
   name: 'Mein Outdoor-Projekt',
   description: '',
-  routes: [],
+  routes: [initialRoute],
   points: [],
-  activeRouteId: '',
+  activeRouteId: initialRoute.id,
   mapLayerId: 'osm',
 }
 
