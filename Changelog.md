@@ -20,7 +20,7 @@ once released versions are maintained.
 - Added a themed Kartenlayer dropdown matching the dark UI, replacing the
   native select with a white popup.
 - Added a native file dialog for GPX export and project saving in the desktop
-  app.
+  app. In the browser, a failing file picker falls back to a normal download.
 - Added a CI workflow that runs lint, unit tests, the web build, and a Tauri
   build without installer on Linux and Windows for every pull request and push
   to `main`.

@@ -318,15 +318,19 @@ async function saveTextFile(filename: string, content: string, type: string) {
 
   const savePicker = (window as SavePickerWindow).showSaveFilePicker
   if (savePicker) {
-    const extension = filename.split('.').pop() ?? 'txt'
-    const handle = await savePicker({
-      suggestedName: filename,
-      types: [{ description: type, accept: { [type]: [`.${extension}`] } }],
-    })
-    const writable = await handle.createWritable()
-    await writable.write(content)
-    await writable.close()
-    return
+    try {
+      const extension = filename.split('.').pop() ?? 'txt'
+      const handle = await savePicker({
+        suggestedName: filename,
+        types: [{ description: type, accept: { [type]: [`.${extension}`] } }],
+      })
+      const writable = await handle.createWritable()
+      await writable.write(content)
+      await writable.close()
+      return
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') throw error
+    }
   }
 
   const blob = new Blob([content], { type })
