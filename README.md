@@ -21,7 +21,7 @@ Trailforge is intended to run on Windows 11 and Linux. The desktop application i
 - Distance, ascent, descent, duration, highest-point, and lowest-point metrics
 - Saving and opening project files
 - GPX export and read-only GPX import by default
-- Independent points on the map
+- Independent points and POIs on the map with categorized symbols
 - Zoom-dependent map scale and north arrow
 - About dialog (Info) with version, project links, data attributions, and a
   filterable list of third-party components with license texts
