@@ -1708,7 +1708,11 @@ function App() {
         aria-label={isNew ? 'Neuen POI anlegen' : `POI ${point.name} bearbeiten`}
         style={{ top: pointEditor?.top, left: pointEditor?.left }}
         onKeyDown={(event) => {
-          if (event.key === 'Escape') setPointEditor(null)
+          if (event.key !== 'Escape') return
+          if (poiIconPickerOpen) {
+            event.stopPropagation()
+            setPoiIconPickerOpen(false)
+          } else setPointEditor(null)
         }}
       >
         <div className="route-editor-heading">
@@ -1753,7 +1757,10 @@ function App() {
                         type="button"
                         aria-label={icon.label}
                         aria-pressed={point.icon === icon.id}
-                        onClick={() => updatePointDraft({ icon: icon.id as PoiIconId })}
+                        onClick={() => {
+                          updatePointDraft({ icon: icon.id as PoiIconId })
+                          setPoiIconPickerOpen(false)
+                        }}
                       >
                         <span
                           aria-hidden="true"
