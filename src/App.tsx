@@ -311,9 +311,14 @@ function LayerDropdown({
 
 async function saveTextFile(filename: string, content: string, type: string) {
   if (isTauri()) {
-    const saved = await invoke<boolean>('save_text_file', { filename, content })
-    if (!saved) throw new DOMException('Save cancelled', 'AbortError')
-    return
+    try {
+      const saved = await invoke<boolean>('save_text_file', { filename, content })
+      if (!saved) throw new DOMException('Save cancelled', 'AbortError')
+      return
+    } catch (error) {
+      // Hosts without Trailforge's Rust backend (e.g. an embedded preview) lack this command.
+      if (!String(error).includes('not found')) throw error
+    }
   }
 
   const savePicker = (window as SavePickerWindow).showSaveFilePicker
