@@ -607,6 +607,7 @@ textarea:focus {
 
 .poi-editor {
   width: min(390px, calc(100vw - 16px));
+  overflow: visible;
 }
 
 .route-editor-heading {
@@ -1121,8 +1122,7 @@ textarea:focus {
 }
 
 .point-marker-wrapper {
-  display: grid;
-  place-items: center;
+  display: block;
   overflow: visible;
 }
 
@@ -1470,11 +1470,10 @@ textarea:focus {
 }
 
 .point-marker {
-  display: flex;
-  width: max-content;
-  max-width: 260px;
-  align-items: center;
-  gap: 6px;
+  position: relative;
+  display: block;
+  width: 28px;
+  height: 36px;
   border-radius: 0;
   box-shadow: none;
   color: #0d1318;
@@ -1529,6 +1528,9 @@ textarea:focus {
 }
 
 .point-marker-label {
+  position: absolute;
+  top: 2px;
+  left: 34px;
   max-width: 210px;
   overflow: hidden;
   padding: 4px 7px;
@@ -1562,6 +1564,7 @@ textarea:focus {
 }
 
 .poi-icon-picker {
+  position: relative;
   margin-bottom: 10px;
   border: 1px solid var(--border);
   border-radius: 7px;
@@ -1614,12 +1617,20 @@ textarea:focus {
 }
 
 .poi-icon-picker-options {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
   display: grid;
-  max-height: 238px;
+  max-height: min(340px, 55vh);
   gap: 7px;
-  padding: 0 8px 8px;
+  padding: 4px 8px 8px;
   overflow: auto;
-  border-top: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
 }
 
 .poi-icon-category {
@@ -1654,6 +1665,12 @@ textarea:focus {
   color: var(--text);
   background: var(--panel-soft);
   line-height: 1;
+}
+
+.poi-icon-option > span {
+  display: block;
+  width: 20px;
+  height: 20px;
 }
 
 .poi-icon-option:hover,

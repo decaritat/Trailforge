@@ -944,8 +944,8 @@ function App() {
           html: `<span class="point-marker"><span class="point-marker-badge"><span class="point-marker-symbol">${poiIconSvg(
             icon,
           )}</span></span><span class="point-marker-label">${label}</span></span>`,
-          iconSize: [260, 42],
-          iconAnchor: [14, 38],
+          iconSize: [28, 36],
+          iconAnchor: [14, 36],
         }),
       })
         .addTo(map)
