@@ -17,6 +17,10 @@ once released versions are maintained.
   texts. External links open in the system browser in the desktop app. The
   version comes from the Git tag in release builds and is marked `-dev`
   otherwise.
+- Added a themed Kartenlayer dropdown matching the dark UI, replacing the
+  native select with a white popup.
+- Added a native file dialog for GPX export and project saving in the desktop
+  app.
 - Added a CI workflow that runs lint, unit tests, the web build, and a Tauri
   build without installer on Linux and Windows for every pull request and push
   to `main`.

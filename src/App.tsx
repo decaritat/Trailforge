@@ -230,7 +230,92 @@ function uid(prefix: string) {
   return `${prefix}-${crypto.randomUUID().slice(0, 8)}`
 }
 
+function LayerDropdown({
+  value,
+  options,
+  disabled,
+  onChange,
+}: {
+  value: string
+  options: Array<{ id: string; label: string }>
+  disabled?: boolean
+  onChange: (id: string) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const selected = options.find((option) => option.id === value) ?? options[0]
+  const menuOpen = open && !disabled
+
+  useEffect(() => {
+    if (!open) return
+    const close = (event: PointerEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [open])
+
+  function move(offset: number) {
+    const index = options.findIndex((option) => option.id === selected.id)
+    const next = options[Math.min(options.length - 1, Math.max(0, index + offset))]
+    if (next) onChange(next.id)
+  }
+
+  return (
+    <div
+      className="dropdown"
+      ref={rootRef}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') setOpen(false)
+        else if (event.key === 'ArrowDown') {
+          event.preventDefault()
+          move(1)
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault()
+          move(-1)
+        }
+      }}
+    >
+      <button
+        type="button"
+        className="dropdown-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={menuOpen}
+        aria-labelledby="layer-select-label"
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+      >
+        {selected.label}
+      </button>
+      {menuOpen && (
+        <ul className="dropdown-menu" role="listbox" aria-labelledby="layer-select-label">
+          {options.map((option) => (
+            <li
+              key={option.id}
+              role="option"
+              aria-selected={option.id === selected.id}
+              className={option.id === selected.id ? 'selected' : undefined}
+              onClick={() => {
+                onChange(option.id)
+                setOpen(false)
+              }}
+            >
+              {option.label}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 async function saveTextFile(filename: string, content: string, type: string) {
+  if (isTauri()) {
+    const saved = await invoke<boolean>('save_text_file', { filename, content })
+    if (!saved) throw new DOMException('Save cancelled', 'AbortError')
+    return
+  }
+
   const savePicker = (window as SavePickerWindow).showSaveFilePicker
   if (savePicker) {
     const extension = filename.split('.').pop() ?? 'txt'
@@ -1847,13 +1932,16 @@ function App() {
           </div>
         </div>
         <div className="topbar-actions">
-          <label className="layer-select">
-            <span>Kartenlayer</span>
-            <select
+          <div className="layer-select">
+            <span id="layer-select-label">Kartenlayer</span>
+            <LayerDropdown
               value={layerId}
               disabled={routePropertiesOpen}
-              onChange={(event) => {
-                const nextLayerId = event.target.value
+              options={layers.map((layer) => ({
+                id: layer.id,
+                label: `${layer.label}${layer.requiresKey ? ' · API-Key' : ''}`,
+              }))}
+              onChange={(nextLayerId) => {
                 const nextLayer = layers.find((layer) => layer.id === nextLayerId)
                 if (nextLayer?.requiresKey) {
                   setNotice('Tracestrack benötigt einen API-Key. OSM Carto bleibt aktiv.')
@@ -1863,15 +1951,8 @@ function App() {
                 setLayerId(nextLayerId)
                 setProject((current) => ({ ...current, mapLayerId: nextLayerId }))
               }}
-            >
-              {layers.map((layer) => (
-                <option value={layer.id} key={layer.id}>
-                  {layer.label}
-                  {layer.requiresKey ? ' · API-Key' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
+          </div>
           <button className="ghost-button" onClick={() => projectInput.current?.click()}>
             Projekt öffnen
           </button>
