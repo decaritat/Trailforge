@@ -378,7 +378,8 @@ function App() {
   const [projectDescriptionDraft, setProjectDescriptionDraft] = useState('')
   const [toolMode, setToolMode] = useState<ToolMode>('route')
   const [mapScale, setMapScale] = useState({ zoom: 7, latitude: 51.1657 })
-  const [importEditable, setImportEditable] = useState(false)
+  const [routeCreationDialogOpen, setRouteCreationDialogOpen] = useState(false)
+  const [routeCreationMode, setRouteCreationMode] = useState<'new' | 'gpx'>('new')
   const [elevationExpanded, setElevationExpanded] = useState(false)
   const [notice, setNotice] = useState('')
   const [errorBanner, setErrorBanner] = useState<ErrorBanner | null>(null)
@@ -419,6 +420,7 @@ function App() {
   const [hoveredProfilePoint, setHoveredProfilePoint] = useState<ProfilePointDetails | null>(null)
   const [poiIconPickerOpen, setPoiIconPickerOpen] = useState(false)
   const importInput = useRef<HTMLInputElement>(null)
+  const routeCreationOptionRef = useRef<HTMLInputElement>(null)
   const projectInput = useRef<HTMLInputElement>(null)
   const searchInput = useRef<HTMLInputElement>(null)
   const projectDescriptionInput = useRef<HTMLTextAreaElement>(null)
@@ -450,6 +452,10 @@ function App() {
       routeEditorRef.current?.querySelector<HTMLInputElement>('.sidebar-route-input')?.focus()
     }
   }, [routeEditor?.routeId])
+
+  useEffect(() => {
+    if (routeCreationDialogOpen) routeCreationOptionRef.current?.focus()
+  }, [routeCreationDialogOpen])
 
   useEffect(() => {
     if (!notice) return
@@ -576,6 +582,7 @@ function App() {
               ),
               geometry: undefined,
               elevations: undefined,
+              timestamps: undefined,
               routingState: 'idle',
               routingError: undefined,
             }
@@ -599,6 +606,7 @@ function App() {
             nodes: [...route.nodes, node],
             geometry: undefined,
             elevations: undefined,
+            timestamps: undefined,
             routingState: 'idle',
             routingError: undefined,
           }
@@ -612,6 +620,7 @@ function App() {
           nodes: [...route.nodes.slice(0, insertIndex), node, ...route.nodes.slice(insertIndex)],
           geometry: undefined,
           elevations: undefined,
+          timestamps: undefined,
           routingState: 'idle',
           routingError: undefined,
         }
@@ -1034,6 +1043,7 @@ function App() {
     markersRef.current.forEach((marker) => marker.removeFrom(map))
     markersRef.current = []
     project.routes.forEach((route) => {
+      if (!route.editable) return
       route.nodes.forEach((node, index) => {
         const marker = L.marker([node.coordinate[1], node.coordinate[0]], {
           draggable:
@@ -1148,6 +1158,7 @@ function App() {
                 nodes: [...route.nodes, node],
                 geometry: undefined,
                 elevations: undefined,
+                timestamps: undefined,
                 routingState: 'idle',
                 routingError: undefined,
               }
@@ -1183,6 +1194,7 @@ function App() {
               nodes: route.nodes.filter((node) => node.id !== nodeId),
               geometry: undefined,
               elevations: undefined,
+              timestamps: undefined,
               routingState: 'idle',
               routingError: undefined,
             }
@@ -1234,6 +1246,20 @@ function App() {
     setNotice('Neue Route aktiv. Klicke auf die Karte, um Routenpunkte zu setzen.')
   }
 
+  function openRouteCreationDialog() {
+    setRouteCreationMode('new')
+    setRouteCreationDialogOpen(true)
+  }
+
+  function confirmRouteCreation() {
+    setRouteCreationDialogOpen(false)
+    if (routeCreationMode === 'new') {
+      createRoute()
+    } else {
+      importInput.current?.click()
+    }
+  }
+
   function deleteRoute(routeId: string) {
     const remainingRoutes = project.routes.filter((route) => route.id !== routeId)
     const nextActiveRouteId =
@@ -1271,6 +1297,10 @@ function App() {
 
   async function exportRoute(route = activeRoute) {
     if (!route) return
+    if (!route.editable) {
+      setNotice('Schreibgeschützte GPX-Routen können nicht exportiert werden.')
+      return
+    }
     try {
       await saveTextFile(
         `${route.name.toLowerCase().replaceAll(/[^a-z0-9]+/gi, '-') || 'route'}.gpx`,
@@ -1321,12 +1351,14 @@ function App() {
 
   function updatePointDraft(patch: Partial<MapPoint>) {
     setPointEditor((current) =>
-      current ? { ...current, draft: { ...current.draft, ...patch } } : current,
+      current && current.draft.editable !== false
+        ? { ...current, draft: { ...current.draft, ...patch } }
+        : current,
     )
   }
 
   function savePointProperties() {
-    if (!pointEditor) return
+    if (!pointEditor || pointEditor.draft.editable === false) return
     const point = {
       ...pointEditor.draft,
       name: pointEditor.draft.name.trim() || 'Neuer POI',
@@ -1344,6 +1376,11 @@ function App() {
   }
 
   function deletePoint(pointId: string) {
+    const point = project.points.find((item) => item.id === pointId)
+    if (!point || point.editable === false) {
+      if (point) setNotice('Schreibgeschützte GPX-POIs können nicht gelöscht werden.')
+      return
+    }
     setProject((current) => ({
       ...current,
       points: current.points.filter((point) => point.id !== pointId),
@@ -1353,7 +1390,7 @@ function App() {
   }
 
   function confirmDeletePoint() {
-    if (!pointEditor || pointEditor.isNew) return
+    if (!pointEditor || pointEditor.isNew || pointEditor.draft.editable === false) return
     const pointName = pointEditor.draft.name.trim() || 'Neuer POI'
     if (window.confirm(`Soll der POI „${pointName}“ wirklich gelöscht werden?`)) {
       deletePoint(pointEditor.pointId)
@@ -1361,7 +1398,7 @@ function App() {
   }
 
   function saveRouteProperties() {
-    if (!routeEditor?.draft.editable) return
+    if (!routeEditor) return
     if (
       routeEditor.draft.showDistanceMarkers &&
       routeEditor.draft.distanceMarkerMode === 'manual' &&
@@ -1375,20 +1412,30 @@ function App() {
     setProject((current) => ({
       ...current,
       routes: current.routes.map((route) =>
-        route.id === routeEditor.routeId
-          ? {
-              ...route,
-              ...routeEditor.draft,
-              ...(route.type !== routeEditor.draft.type
-                ? {
-                    geometry: undefined,
-                    elevations: undefined,
-                    routingState: 'idle' as const,
-                    routingError: undefined,
-                  }
-                : {}),
-            }
-          : route,
+        route.id !== routeEditor.routeId
+          ? route
+          : route.editable
+            ? {
+                ...route,
+                ...routeEditor.draft,
+                ...(route.type !== routeEditor.draft.type
+                  ? {
+                      geometry: undefined,
+                      elevations: undefined,
+                      timestamps: undefined,
+                      routingState: 'idle' as const,
+                      routingError: undefined,
+                    }
+                  : {}),
+              }
+            : {
+                ...route,
+                color: routeEditor.draft.color,
+                customColor: routeEditor.draft.customColor,
+                showDistanceMarkers: routeEditor.draft.showDistanceMarkers,
+                distanceMarkerMode: routeEditor.draft.distanceMarkerMode,
+                distanceMarkerStepKm: routeEditor.draft.distanceMarkerStepKm,
+              },
       ),
     }))
     setRouteEditor(null)
@@ -1424,25 +1471,30 @@ function App() {
 
   function importGpx(file: File) {
     file.text().then((content) => {
-      const parsedRoute = parseGpx(content, importEditable)
-      const route = parsedRoute
-        ? { ...parsedRoute, description: parsedRoute.description.slice(0, 180) }
-        : null
-      if (!route) {
+      const parsed = parseGpx(content)
+      if (!parsed) {
         setNotice('Die GPX-Datei konnte nicht gelesen werden.')
         return
+      }
+      const route = {
+        ...parsed.route,
+        editable: false,
+        description: parsed.route.description.slice(0, 180),
       }
       setProject((current) => ({
         ...current,
         routes: [...current.routes, route],
+        points: [...current.points, ...parsed.waypoints],
         activeRouteId: route.id,
       }))
-      setNotice(
-        importEditable
-          ? 'GPX als bearbeitbare Route importiert.'
-          : 'GPX schreibgeschützt importiert.',
-      )
-    })
+      const waypointNotice = parsed.waypoints.length
+        ? ` ${parsed.waypoints.length} GPX-Wegpunkt${parsed.waypoints.length === 1 ? '' : 'e'} als POI übernommen.`
+        : ''
+      const skippedWaypointNotice = parsed.skippedWaypoints
+        ? ` ${parsed.skippedWaypoints} ungültige GPX-Wegpunkte übersprungen.`
+        : ''
+      setNotice(`GPX schreibgeschützt importiert.${waypointNotice}${skippedWaypointNotice}`)
+    }).catch(() => setNotice('Die GPX-Datei konnte nicht gelesen werden.'))
   }
 
   function importProject(file: File) {
@@ -1662,7 +1714,11 @@ function App() {
       >
         <div className="route-editor-heading">
           <span className="eyebrow">Routeneigenschaften</span>
-          {!route.editable && <span className="lock-badge">read-only</span>}
+          {!route.editable && (
+            <span className="lock-badge" title="Diese Route ist schreibgeschützt">
+              READ-ONLY
+            </span>
+          )}
         </div>
         <input
           className="sidebar-route-input"
@@ -1684,30 +1740,44 @@ function App() {
           rows={3}
         />
         <span className="route-description-length">{route.description.length}/180 Zeichen</span>
-        <div className="route-editor-section">
-          <div className="route-editor-section-header">
+        {route.editable ? (
+          <div className="route-editor-section">
+            <div className="route-editor-section-header">
+              <label className="route-editor-section-label" htmlFor={`route-type-${route.id}`}>
+                Routentyp
+              </label>
+              <ExternalLink
+                url={ROUTING_PROVIDER.attributionUrl}
+                className="route-editor-provider-link"
+                title={`Routing über ${ROUTING_PROVIDER.label} (${routingProfileLabel(route.type)})`}
+              >
+                via {ROUTING_PROVIDER.label}
+              </ExternalLink>
+            </div>
+            <select
+              id={`route-type-${route.id}`}
+              value={route.type}
+              onChange={(event) => updateRouteDraft({ type: event.target.value as RouteType })}
+              aria-label="Routentyp"
+            >
+              <option value="hiking">Wandern</option>
+              <option value="cycling">Radfahren</option>
+            </select>
+          </div>
+        ) : route.gpxType ? (
+          <div className="route-editor-section">
             <label className="route-editor-section-label" htmlFor={`route-type-${route.id}`}>
               Routentyp
             </label>
-            <ExternalLink
-              url={ROUTING_PROVIDER.attributionUrl}
-              className="route-editor-provider-link"
-              title={`Routing über ${ROUTING_PROVIDER.label} (${routingProfileLabel(route.type)})`}
-            >
-              via {ROUTING_PROVIDER.label}
-            </ExternalLink>
+            <input
+              id={`route-type-${route.id}`}
+              className="sidebar-route-input"
+              value={route.gpxType}
+              readOnly
+              aria-label="Routentyp (schreibgeschützt)"
+            />
           </div>
-          <select
-            id={`route-type-${route.id}`}
-            value={route.type}
-            onChange={(event) => updateRouteDraft({ type: event.target.value as RouteType })}
-            disabled={!route.editable}
-            aria-label="Routentyp"
-          >
-            <option value="hiking">Wandern</option>
-            <option value="cycling">Radfahren</option>
-          </select>
-        </div>
+        ) : null}
         <div className="route-editor-section route-color-section">
           <span className="route-editor-section-label">Routenfarbe</span>
           <div className="route-color-controls">
@@ -1720,7 +1790,6 @@ function App() {
                   style={{ backgroundColor: color }}
                   title={`Farbe ${color}`}
                   onClick={() => updateRouteDraft({ color, customColor })}
-                  disabled={!route.editable}
                 />
               ))}
             </div>
@@ -1734,7 +1803,6 @@ function App() {
                     customColor: event.target.value,
                   })
                 }
-                disabled={!route.editable}
                 aria-label="Eigene Routenfarbe"
               />
               <span>Eigene Farbe</span>
@@ -1743,14 +1811,13 @@ function App() {
         </div>
         <fieldset className="distance-marker-settings">
           <legend className="distance-marker-heading">
-            <label className={`distance-marker-toggle ${route.editable ? '' : 'disabled'}`}>
+            <label className="distance-marker-toggle">
               <input
                 type="checkbox"
                 checked={showDistanceMarkers}
                 onChange={(event) =>
                   updateRouteDraft({ showDistanceMarkers: event.target.checked })
                 }
-                disabled={!route.editable}
               />
               <span className="distance-marker-switch" aria-hidden="true" />
               <span>Abstandsmarker</span>
@@ -1772,7 +1839,7 @@ function App() {
                 value="auto"
                 checked={distanceMarkerMode === 'auto'}
                 onChange={() => updateRouteDraft({ distanceMarkerMode: 'auto' })}
-                disabled={!route.editable || !showDistanceMarkers}
+                disabled={!showDistanceMarkers}
               />
               <span>Anpassung an den Kartenmaßstab</span>
             </label>
@@ -1790,7 +1857,7 @@ function App() {
                       : 1,
                   })
                 }
-                disabled={!route.editable || !showDistanceMarkers}
+                disabled={!showDistanceMarkers}
               />
               <span>Anzeigen in Schritten von</span>
               <input
@@ -1806,7 +1873,7 @@ function App() {
                       event.target.value === '' ? undefined : Number(event.target.value),
                   })
                 }
-                disabled={!route.editable || !showDistanceMarkers || distanceMarkerMode !== 'manual'}
+                disabled={!showDistanceMarkers || distanceMarkerMode !== 'manual'}
                 aria-invalid={manualDistanceMarkerInvalid}
                 aria-label="Manuelle Schrittweite in Kilometern"
               />
@@ -1825,7 +1892,6 @@ function App() {
             className="route-editor-action save"
             type="button"
             onClick={saveRouteProperties}
-            disabled={!route.editable}
             aria-label="Routeneigenschaften übernehmen"
             title="Übernehmen"
           >
@@ -1848,13 +1914,20 @@ function App() {
   function renderPointEditor(point: MapPoint) {
     const selectedIcon = getPoiIcon(point.icon)
     const isNew = pointEditor?.isNew ?? false
+    const isReadOnly = point.editable === false
 
     return (
       <section
         className="route-editor poi-editor"
         role="dialog"
         aria-modal="true"
-        aria-label={isNew ? 'Neuen POI anlegen' : `POI ${point.name} bearbeiten`}
+        aria-label={
+          isNew
+            ? 'Neuen POI anlegen'
+            : isReadOnly
+              ? `POI ${point.name} anzeigen`
+              : `POI ${point.name} bearbeiten`
+        }
         style={{ top: pointEditor?.top, left: pointEditor?.left }}
         onKeyDown={(event) => {
           if (event.key !== 'Escape') return
@@ -1866,6 +1939,7 @@ function App() {
       >
         <div className="route-editor-heading">
           <span className="eyebrow">{isNew ? 'POI anlegen' : 'POI-Eigenschaften'}</span>
+          {isReadOnly && <span className="lock-badge">READ-ONLY</span>}
           <span
             className="poi-editor-selected-icon"
             aria-hidden="true"
@@ -1878,6 +1952,7 @@ function App() {
             type="button"
             aria-expanded={poiIconPickerOpen}
             aria-controls={`poi-icon-picker-options-${point.id}`}
+            disabled={isReadOnly}
             onClick={() => setPoiIconPickerOpen((open) => !open)}
           >
             <span className="route-editor-section-label">Symbol</span>
@@ -1904,6 +1979,7 @@ function App() {
                         className={`poi-icon-option ${point.icon === icon.id ? 'selected' : ''}`}
                         key={icon.id}
                         type="button"
+                        disabled={isReadOnly}
                         aria-label={icon.label}
                         aria-pressed={point.icon === icon.id}
                         onClick={() => {
@@ -1927,6 +2003,7 @@ function App() {
           className="sidebar-route-input"
           value={point.name}
           onChange={(event) => updatePointDraft({ name: event.target.value })}
+          disabled={isReadOnly}
           aria-label="POI-Titel"
           placeholder="POI-Titel"
         />
@@ -1936,6 +2013,7 @@ function App() {
           onChange={(event) =>
             updatePointDraft({ description: event.target.value.slice(0, 180) })
           }
+          disabled={isReadOnly}
           aria-label="POI-Beschreibung"
           placeholder="POI-Beschreibung"
           maxLength={180}
@@ -1943,7 +2021,7 @@ function App() {
         />
         <span className="route-description-length">{point.description.length}/180 Zeichen</span>
         <div className="route-editor-actions">
-          {!isNew && (
+          {!isNew && !isReadOnly && (
             <button
               className="route-editor-action delete"
               type="button"
@@ -1954,23 +2032,25 @@ function App() {
               × Löschen
             </button>
           )}
-          <button
-            className="route-editor-action save"
-            type="button"
-            onClick={savePointProperties}
-            aria-label="POI-Eigenschaften übernehmen"
-            title="Übernehmen"
-          >
-            ✓ Übernehmen
-          </button>
+          {!isReadOnly && (
+            <button
+              className="route-editor-action save"
+              type="button"
+              onClick={savePointProperties}
+              aria-label="POI-Eigenschaften übernehmen"
+              title="Übernehmen"
+            >
+              ✓ Übernehmen
+            </button>
+          )}
           <button
             className="route-editor-action cancel"
             type="button"
             onClick={() => setPointEditor(null)}
-            aria-label="POI-Eigenschaften verwerfen und schließen"
-            title="Abbrechen"
+            aria-label={isReadOnly ? 'POI-Ansicht schließen' : 'POI-Eigenschaften verwerfen und schließen'}
+            title={isReadOnly ? 'Schließen' : 'Abbrechen'}
           >
-            × Abbrechen
+            {isReadOnly ? 'Schließen' : '× Abbrechen'}
           </button>
         </div>
       </section>
@@ -1984,7 +2064,7 @@ function App() {
   return (
     <div
       className="app-shell"
-      inert={routePropertiesOpen || aboutOpen}
+      inert={routePropertiesOpen || aboutOpen || routeCreationDialogOpen}
       onClick={() => contextMenu && setContextMenu(null)}
     >
       <header className="topbar">
@@ -2128,7 +2208,13 @@ function App() {
                 </div>
               )}
             </div>
-            <button className="icon-button" type="button" title="Neue Route" onClick={createRoute}>
+            <button
+              className="icon-button"
+              type="button"
+              title="Neue Route erstellen oder GPX importieren"
+              aria-label="Neue Route erstellen oder GPX importieren"
+              onClick={openRouteCreationDialog}
+            >
               +
             </button>
           </div>
@@ -2157,12 +2243,19 @@ function App() {
                       />
                       <span className="route-card-content">
                         <span className="route-card-title">
-                          {route.name}
-                          {!route.editable && <span className="lock-badge">read-only</span>}
-                        </span>
-                        <span className="route-card-meta">
-                          {route.type === 'hiking' ? 'Wandern' : 'Radfahren'}
-                        </span>
+                            {route.name}
+                            {!route.editable && (
+                              <span className="lock-badge" title="Diese Route ist schreibgeschützt">
+                                READ-ONLY
+                              </span>
+                            )}
+                          </span>
+                          {(route.editable || route.gpxType) && (
+                            <span className="route-card-meta">
+                              {route.gpxType ??
+                                (route.type === 'hiking' ? 'Wandern' : 'Radfahren')}
+                            </span>
+                          )}
                         <span className="route-card-stats">
                           <span>{metrics.length.toFixed(1)} km</span>
                           <span>{formatDuration(metrics.durationMinutes)}</span>
@@ -2234,17 +2327,19 @@ function App() {
                 >
                   Eigenschaften
                 </button>
-                <button
-                  className="route-menu-item"
-                  type="button"
-                  role="menuitem"
-                  onClick={() => {
-                    setOpenRouteMenu(null)
-                    void exportRoute(openMenuRoute)
-                  }}
-                >
-                  GPX exportieren
-                </button>
+                {openMenuRoute.editable && (
+                  <button
+                    className="route-menu-item"
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setOpenRouteMenu(null)
+                      void exportRoute(openMenuRoute)
+                    }}
+                  >
+                    GPX exportieren
+                  </button>
+                )}
                 <button
                   className="route-menu-item danger"
                   type="button"
@@ -2272,28 +2367,80 @@ function App() {
               </>,
               document.body,
             )}
+          {routeCreationDialogOpen &&
+            createPortal(
+              <>
+                <div className="route-editor-backdrop" aria-hidden="true" />
+                <section
+                  className="route-creation-dialog"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="route-creation-title"
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') setRouteCreationDialogOpen(false)
+                  }}
+                >
+                  <div className="route-editor-heading">
+                    <span className="eyebrow" id="route-creation-title">
+                      Was möchtest du tun?
+                    </span>
+                  </div>
+                  <fieldset className="route-creation-options">
+                    <label className="route-creation-option">
+                      <input
+                        ref={routeCreationOptionRef}
+                        type="radio"
+                        name="route-creation-mode"
+                        value="new"
+                        checked={routeCreationMode === 'new'}
+                        onChange={() => setRouteCreationMode('new')}
+                      />
+                      <span>Neue Route erstellen</span>
+                    </label>
+                    <label className="route-creation-option">
+                      <input
+                        type="radio"
+                        name="route-creation-mode"
+                        value="gpx"
+                        checked={routeCreationMode === 'gpx'}
+                        onChange={() => setRouteCreationMode('gpx')}
+                      />
+                      <span>GPX-Datei importieren</span>
+                    </label>
+                  </fieldset>
+                  <div className="route-editor-actions">
+                    <button
+                      className="route-editor-action cancel"
+                      type="button"
+                      onClick={() => setRouteCreationDialogOpen(false)}
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      className="route-editor-action save"
+                      type="button"
+                      onClick={confirmRouteCreation}
+                    >
+                      Weiter
+                    </button>
+                  </div>
+                </section>
+              </>,
+              document.body,
+            )}
 
           <div className="sidebar-bottom">
-            <label className="import-toggle">
-              <input
-                type="checkbox"
-                checked={importEditable}
-                onChange={(event) => setImportEditable(event.target.checked)}
-              />
-              GPX-Import bearbeitbar
-            </label>
-            <div className="sidebar-actions">
-              <button className="secondary-button" onClick={() => importInput.current?.click()}>
-                GPX importieren
-              </button>
-              <input
-                ref={importInput}
-                className="hidden-input"
-                type="file"
-                accept=".gpx,application/gpx+xml"
-                onChange={(event) => event.target.files?.[0] && importGpx(event.target.files[0])}
-              />
-            </div>
+            <input
+              ref={importInput}
+              className="hidden-input"
+              type="file"
+              accept=".gpx,application/gpx+xml"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0]
+                event.currentTarget.value = ''
+                if (file) importGpx(file)
+              }}
+            />
             <div className="provider-status">
               <span
                 className={`status-dot ${

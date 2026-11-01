@@ -20,7 +20,11 @@ Trailforge is intended to run on Windows 11 and Linux. The desktop application i
 - Elevation profile with distance, elevation, and time information
 - Distance, ascent, descent, duration, highest-point, and lowest-point metrics
 - Saving and opening project files
-- GPX export and read-only GPX import by default
+- GPX export for editable routes and read-only GPX import; imported routes can
+  change color and distance markers while geometry, name, and description stay
+  locked; available GPX route types are shown read-only, timestamps/elevations
+  feed statistics, and imported routes cannot be re-exported as GPX. GPX
+  waypoints are imported as read-only POIs.
 - Independent points and POIs on the map with categorized symbols
 - Zoom-dependent map scale and north arrow
 - About dialog (Info) with version, project links, data attributions, and a

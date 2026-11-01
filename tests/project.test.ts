@@ -45,6 +45,36 @@ describe('project normalization', () => {
     expect(project.routes[0].description).toHaveLength(180)
   })
 
+  it('persists read-only route state and GPX timestamps through project normalization', () => {
+    const project = normalizeProject({
+      ...initialProject,
+      routes: [
+        {
+          ...initialProject.routes[0],
+          editable: false,
+          gpxType: 'cycling',
+          timestamps: ['2025-05-01T10:00:00Z', '2025-05-01T11:00:00Z'],
+        },
+      ],
+      points: [
+        {
+          id: 'gpx-point-1',
+          name: 'GPX-Wegpunkt',
+          description: '',
+          coordinate: [13, 52],
+          source: 'poi',
+          editable: false,
+        },
+      ],
+    })
+
+    const restored = normalizeProject(JSON.parse(JSON.stringify(project)))
+    expect(restored.routes[0].editable).toBe(false)
+    expect(restored.routes[0].gpxType).toBe('cycling')
+    expect(restored.routes[0].timestamps).toEqual(project.routes[0].timestamps)
+    expect(restored.points[0].editable).toBe(false)
+  })
+
   it('adds a default icon to legacy points and preserves selected icons', () => {
     const project = normalizeProject({
       ...initialProject,
