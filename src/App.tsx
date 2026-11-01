@@ -23,6 +23,7 @@ import {
 import {
   getDisplayedRouteCoordinates,
   getRouteCoordinates,
+  getRouteInsertionIndex,
   type Coordinate,
   type MapPoint,
   type ProfilePointDetails,
@@ -576,41 +577,8 @@ function App() {
           }
         }
 
-        let insertIndex = route.nodes.length
-        let closestDistance = Number.POSITIVE_INFINITY
-        for (let index = 1; index < route.nodes.length; index += 1) {
-          const from = route.nodes[index - 1].coordinate
-          const to = route.nodes[index].coordinate
-          const latitudeScale =
-            Math.cos((((from[1] + to[1] + coordinate[1]) / 3) * Math.PI) / 180) || 1
-          const pointX = coordinate[0] * latitudeScale
-          const pointY = coordinate[1]
-          const fromX = from[0] * latitudeScale
-          const fromY = from[1]
-          const toX = to[0] * latitudeScale
-          const toY = to[1]
-          const deltaX = toX - fromX
-          const deltaY = toY - fromY
-          const segmentLengthSquared = deltaX * deltaX + deltaY * deltaY
-          const projection =
-            segmentLengthSquared === 0
-              ? 0
-              : Math.min(
-                  1,
-                  Math.max(
-                    0,
-                    ((pointX - fromX) * deltaX + (pointY - fromY) * deltaY) /
-                      segmentLengthSquared,
-                  ),
-                )
-          const closestX = fromX + projection * deltaX
-          const closestY = fromY + projection * deltaY
-          const distance = (pointX - closestX) ** 2 + (pointY - closestY) ** 2
-          if (distance < closestDistance) {
-            closestDistance = distance
-            insertIndex = index
-          }
-        }
+        const insertIndex =
+          getRouteInsertionIndex(route.nodes, coordinate) ?? route.nodes.length
 
         return {
           ...route,
@@ -827,6 +795,8 @@ function App() {
         ) return
         event.originalEvent.stopPropagation()
         let moved = false
+        let previewMarker: L.CircleMarker | null = null
+        let previewGuides: L.Polyline[] = []
         const draggingWasEnabled = map.dragging.enabled()
         map.dragging.disable()
         const onMouseMove = (moveEvent: MouseEvent) => {
@@ -837,6 +807,53 @@ function App() {
             ) > 5
           ) {
             moved = true
+          }
+          if (!moved) return
+
+          const rect = map.getContainer().getBoundingClientRect()
+          const cursorPoint = map.containerPointToLatLng(
+            L.point(moveEvent.clientX - rect.left, moveEvent.clientY - rect.top),
+          )
+          if (!previewMarker) {
+            previewMarker = L.circleMarker(cursorPoint, {
+              color: '#ffffff',
+              fillColor: '#000000',
+              fillOpacity: 1,
+              interactive: false,
+              radius: 5,
+              weight: 1,
+            }).addTo(map)
+          } else {
+            previewMarker.setLatLng(cursorPoint)
+          }
+
+          const insertIndex = getRouteInsertionIndex(route.nodes, [
+            cursorPoint.lng,
+            cursorPoint.lat,
+          ])
+          if (insertIndex === null) return
+          const neighboringNodes = [
+            route.nodes[insertIndex - 1],
+            route.nodes[insertIndex],
+          ]
+          if (previewGuides.length === 0) {
+            previewGuides = neighboringNodes.map((node) =>
+              L.polyline([cursorPoint, [node.coordinate[1], node.coordinate[0]]], {
+                color: '#000000',
+                dashArray: '4 6',
+                interactive: false,
+                opacity: 0.9,
+                weight: 2,
+              }).addTo(map),
+            )
+          } else {
+            previewGuides.forEach((guide, index) => {
+              const node = neighboringNodes[index]
+              guide.setLatLngs([
+                cursorPoint,
+                [node.coordinate[1], node.coordinate[0]],
+              ])
+            })
           }
         }
         const onMouseUp = (upEvent: MouseEvent) => {
@@ -864,6 +881,8 @@ function App() {
         cleanupDrag = () => {
           document.removeEventListener('mousemove', onMouseMove)
           document.removeEventListener('mouseup', onMouseUp)
+          previewMarker?.removeFrom(map)
+          previewGuides.forEach((guide) => guide.removeFrom(map))
           cleanupDrag = null
         }
         document.addEventListener('mousemove', onMouseMove)
