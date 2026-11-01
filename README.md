@@ -23,6 +23,9 @@ Trailforge is intended to run on Windows 11 and Linux. The desktop application i
 - GPX export and read-only GPX import by default
 - Independent points and POIs on the map with categorized symbols
 - Zoom-dependent map scale and north arrow
+- Inspector tooltips explaining routing and elevation state, and direct
+  context-sensitive provider attribution links (OpenStreetMap, OpenTopoMap,
+  BRouter, Nominatim, Leaflet)
 - About dialog (Info) with version, project links, data attributions, and a
   filterable list of third-party components with license texts
 ## Development

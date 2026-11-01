@@ -92,6 +92,28 @@
   text-transform: uppercase;
 }
 
+.layer-attribution-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted);
+  background: var(--panel-raised);
+  font-size: 11px;
+  text-decoration: none;
+  white-space: nowrap;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.layer-attribution-badge:hover,
+.layer-attribution-badge:focus-visible {
+  color: var(--green);
+  border-color: var(--green);
+}
+
 select,
 .project-name,
 .route-name-input,
@@ -655,11 +677,32 @@ textarea:focus {
   margin-top: 8px;
 }
 
+.route-editor-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
 .route-editor-section-label {
   color: var(--faint);
   font-size: 9px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.route-editor-provider-link {
+  color: var(--muted);
+  font-size: 10px;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 2px;
+  transition: color 120ms ease, text-decoration-color 120ms ease;
+}
+
+.route-editor-provider-link:hover,
+.route-editor-provider-link:focus-visible {
+  color: var(--green);
+  text-decoration-color: var(--green);
 }
 
 .route-editor-section select {
@@ -911,6 +954,21 @@ textarea:focus {
   margin-top: 17px;
   color: var(--faint);
   font-size: 10px;
+}
+
+.provider-name-link {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 2px;
+  transition: color 120ms ease, text-decoration-color 120ms ease;
+}
+
+.provider-name-link:hover,
+.provider-name-link:focus-visible {
+  color: var(--green);
+  text-decoration-color: var(--green);
 }
 
 .status-dot {
@@ -1269,17 +1327,30 @@ textarea:focus {
   background: rgba(194, 245, 198, 0.55);
 }
 
-.map-search-attribution {
-  display: block;
+.map-search-attribution-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
   padding: 6px 9px;
-  color: #52636b;
+  border-top: 1px solid rgba(38, 52, 59, 0.12);
   font-size: 9px;
-  text-align: right;
+}
+
+.map-search-attribution {
+  display: inline-block;
+  color: #52636b;
   text-decoration: none;
 }
 
-.map-search-attribution:hover {
+.map-search-attribution:hover,
+.map-search-attribution:focus-visible {
+  color: #111820;
   text-decoration: underline;
+}
+
+.map-search-attribution-sep {
+  color: #8b999f;
 }
 
 .search-result-pin-wrapper {
@@ -1793,10 +1864,48 @@ textarea:focus {
   margin-bottom: 3px;
   color: var(--green);
   font-size: 10px;
+  cursor: help;
+  text-decoration: underline dotted rgba(126, 231, 135, 0.45);
+  text-underline-offset: 3px;
 }
 
 .inspector-route-status.error {
   color: #ffb8b2;
+  text-decoration-color: rgba(255, 184, 178, 0.45);
+}
+
+.inspector-elevation-status {
+  align-self: flex-end;
+  margin-bottom: 3px;
+  color: var(--green);
+  font-size: 10px;
+  cursor: help;
+  text-decoration: underline dotted rgba(126, 231, 135, 0.45);
+  text-underline-offset: 3px;
+}
+
+.inspector-elevation-status.inactive {
+  color: var(--muted);
+  text-decoration-color: rgba(142, 160, 169, 0.45);
+}
+
+.elevation-profile-status {
+  margin-left: auto;
+  color: var(--green);
+  font-size: 10px;
+  cursor: help;
+  text-decoration: underline dotted rgba(126, 231, 135, 0.45);
+  text-underline-offset: 3px;
+}
+
+.elevation-profile-status.inactive {
+  color: var(--muted);
+  text-decoration-color: rgba(142, 160, 169, 0.45);
+}
+
+.compact-metric-grid span[title],
+.metric[title] {
+  cursor: help;
 }
 
 .route-name-input:focus {
@@ -2102,6 +2211,36 @@ textarea:focus {
   letter-spacing: 0.04em;
 }
 
+.footer-link {
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 120ms ease;
+}
+
+.footer-link:hover,
+.footer-link:focus-visible {
+  color: #a5f3ad;
+}
+
+.footer-attribution-button {
+  padding: 0;
+  border: none;
+  color: var(--muted);
+  background: transparent;
+  font: inherit;
+  font-size: 9px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 120ms ease;
+}
+
+.footer-attribution-button:hover,
+.footer-attribution-button:focus-visible {
+  color: var(--green);
+}
+
 .hidden-input {
   display: none;
 }
@@ -2205,11 +2344,35 @@ textarea:focus {
 }
 
 .dropdown-menu li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
   padding: 7px 10px;
   border-radius: 5px;
   color: var(--text);
   white-space: nowrap;
   cursor: pointer;
+}
+
+.dropdown-item-attribution {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  transition: color 120ms ease, border-color 120ms ease;
+}
+
+.dropdown-item-attribution:hover,
+.dropdown-item-attribution:focus-visible {
+  color: var(--green);
+  border-color: var(--green);
 }
 
 .dropdown-menu li:hover {
