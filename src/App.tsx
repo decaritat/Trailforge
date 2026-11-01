@@ -2858,28 +2858,6 @@ function App() {
           </section>
         </section>
       </main>
-      <footer className="app-footer">
-        <span>Trailforge · Open Source Route Planner</span>
-        <span>
-          Kartendaten{' '}
-          <ExternalLink
-            url={OSM_COPYRIGHT_URL}
-            className="footer-link"
-            title="OpenStreetMap Copyright & Lizenz (ODbL) öffnen"
-          >
-            © OpenStreetMap contributors
-          </ExternalLink>
-          {' · '}
-          <button
-            type="button"
-            className="footer-attribution-button"
-            onClick={() => setAboutOpen(true)}
-            title="Alle Provider-Attributionen und Drittanbieterlizenzen anzeigen"
-          >
-            Provider-Attribution
-          </button>
-        </span>
-      </footer>
       {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
     </div>
   )

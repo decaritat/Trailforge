@@ -15,9 +15,8 @@ once released versions are maintained.
   context-sensitive attribution links for map tile providers (OpenStreetMap
   Carto, OpenTopoMap) beside the layer dropdown, routing provider (BRouter) in
   the sidebar and route properties, geocoding provider (Nominatim) in place
-  search, and OpenStreetMap in the footer. Preserved visible Leaflet
-  attribution on the map with system browser link opening across desktop and
-  web.
+  search. Preserved visible Leaflet attribution on the map with system browser
+  link opening across desktop and web.
 - Added an About dialog (Info button) showing the Trailforge version, links to
   the GitHub project, documentation, changelog, and license, data and service
   attributions (OpenStreetMap, OpenTopoMap, Nominatim, BRouter, Leaflet), and a

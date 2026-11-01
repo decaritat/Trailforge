@@ -17,7 +17,7 @@
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-rows: 72px minmax(0, 1fr) 32px;
+  grid-template-rows: 72px minmax(0, 1fr);
   background:
     radial-gradient(circle at 75% -10%, rgba(52, 101, 81, 0.18), transparent 34rem),
     var(--bg);
@@ -2198,47 +2198,6 @@ textarea:focus {
 .elevation-axis-title {
   fill: var(--faint);
   font-size: 10px;
-}
-
-.app-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 29px;
-  color: var(--faint);
-  background: #0b1014;
-  font-size: 9px;
-  letter-spacing: 0.04em;
-}
-
-.footer-link {
-  color: var(--green);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transition: color 120ms ease;
-}
-
-.footer-link:hover,
-.footer-link:focus-visible {
-  color: #a5f3ad;
-}
-
-.footer-attribution-button {
-  padding: 0;
-  border: none;
-  color: var(--muted);
-  background: transparent;
-  font: inherit;
-  font-size: 9px;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  transition: color 120ms ease;
-}
-
-.footer-attribution-button:hover,
-.footer-attribution-button:focus-visible {
-  color: var(--green);
 }
 
 .hidden-input {
