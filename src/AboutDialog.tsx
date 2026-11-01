@@ -4,13 +4,11 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
-  type MouseEvent,
-  type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
-import { isTauri } from '@tauri-apps/api/core'
-import { openUrl } from '@tauri-apps/plugin-opener'
+import { ExternalLink } from './ExternalLink'
 import { getAppVersion } from './appVersion'
+import { ALL_PROVIDER_ATTRIBUTIONS } from './providers'
 import './AboutDialog.css'
 
 const REPOSITORY_URL = 'https://github.com/decaritat/Trailforge'
@@ -43,47 +41,6 @@ const projectLinks = [
   { label: 'Changelog', url: `${REPOSITORY_URL}/blob/main/Changelog.md` },
   { label: 'Lizenz (GPL-3.0-or-later)', url: `${REPOSITORY_URL}/blob/main/LICENSE` },
 ]
-
-const attributions = [
-  {
-    name: 'OpenStreetMap',
-    text: 'Kartendaten © OpenStreetMap-Mitwirkende, lizenziert unter der Open Database License (ODbL).',
-    url: 'https://www.openstreetmap.org/copyright',
-  },
-  {
-    name: 'OpenTopoMap',
-    text: 'Kartenstil © OpenTopoMap (CC-BY-SA 3.0), Daten © OpenStreetMap-Mitwirkende, SRTM.',
-    url: 'https://opentopomap.org/about',
-  },
-  {
-    name: 'Nominatim',
-    text: 'Ortssuche über den öffentlichen Nominatim-Dienst der OpenStreetMap Foundation.',
-    url: 'https://operations.osmfoundation.org/policies/nominatim/',
-  },
-  {
-    name: 'BRouter',
-    text: 'Routenberechnung über die öffentliche BRouter-Instanz auf Basis von OpenStreetMap-Daten.',
-    url: 'https://brouter.de/brouter-web/',
-  },
-  {
-    name: 'Leaflet',
-    text: 'Kartendarstellung mit Leaflet, © Volodymyr Agafonkin und Mitwirkende (BSD-2-Clause).',
-    url: 'https://leafletjs.com/',
-  },
-]
-
-function ExternalLink({ url, children }: { url: string; children: ReactNode }) {
-  const open = (event: MouseEvent<HTMLAnchorElement>) => {
-    if (!isTauri()) return
-    event.preventDefault()
-    openUrl(url).catch((error) => console.error('Link konnte nicht geöffnet werden', error))
-  }
-  return (
-    <a href={url} target="_blank" rel="noopener noreferrer" onClick={open}>
-      {children}
-    </a>
-  )
-}
 
 export default function AboutDialog({ onClose }: { onClose: () => void }) {
   const dialogRef = useRef<HTMLDivElement>(null)
@@ -199,7 +156,7 @@ export default function AboutDialog({ onClose }: { onClose: () => void }) {
           <section aria-labelledby="about-data">
             <h3 id="about-data">Daten und Dienste</h3>
             <ul className="about-attributions">
-              {attributions.map((item) => (
+              {ALL_PROVIDER_ATTRIBUTIONS.map((item) => (
                 <li key={item.name}>
                   <ExternalLink url={item.url}>{item.name}</ExternalLink>
                   <span>{item.text}</span>
