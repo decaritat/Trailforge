@@ -96,6 +96,51 @@ export function getDisplayedRouteCoordinates(route: Route): Coordinate[] {
   return route.geometry?.length ? route.geometry : getRouteCoordinates(route)
 }
 
+export function getRouteInsertionIndex(
+  nodes: RouteNode[],
+  coordinate: Coordinate,
+): number | null {
+  if (nodes.length < 2) return null
+
+  let insertIndex = nodes.length
+  let closestDistance = Number.POSITIVE_INFINITY
+  for (let index = 1; index < nodes.length; index += 1) {
+    const from = nodes[index - 1].coordinate
+    const to = nodes[index].coordinate
+    const latitudeScale =
+      Math.cos((((from[1] + to[1] + coordinate[1]) / 3) * Math.PI) / 180) || 1
+    const pointX = coordinate[0] * latitudeScale
+    const pointY = coordinate[1]
+    const fromX = from[0] * latitudeScale
+    const fromY = from[1]
+    const toX = to[0] * latitudeScale
+    const toY = to[1]
+    const deltaX = toX - fromX
+    const deltaY = toY - fromY
+    const segmentLengthSquared = deltaX * deltaX + deltaY * deltaY
+    const projection =
+      segmentLengthSquared === 0
+        ? 0
+        : Math.min(
+            1,
+            Math.max(
+              0,
+              ((pointX - fromX) * deltaX + (pointY - fromY) * deltaY) /
+                segmentLengthSquared,
+            ),
+          )
+    const closestX = fromX + projection * deltaX
+    const closestY = fromY + projection * deltaY
+    const distance = (pointX - closestX) ** 2 + (pointY - closestY) ** 2
+    if (distance < closestDistance) {
+      closestDistance = distance
+      insertIndex = index
+    }
+  }
+
+  return insertIndex
+}
+
 export function getDisplayedRouteElevations(route: Route) {
   const coordinates = getDisplayedRouteCoordinates(route)
   if (

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getCumulativeDistances,
   getDisplayedRouteCoordinates,
+  getRouteInsertionIndex,
   type Route,
 } from '../src/routeModel'
 import {
@@ -34,6 +35,18 @@ function createRoute(type: Route['type'] = 'hiking'): Route {
 }
 
 describe('route geometry and metrics', () => {
+  it('finds the route segment nearest to a new point', () => {
+    const route = createRoute()
+    const nodes: Route['nodes'] = [
+      ...route.nodes,
+      { id: 'node-3', coordinate: [0.04, 0] },
+    ]
+
+    expect(getRouteInsertionIndex(nodes, [0.005, 0.001])).toBe(1)
+    expect(getRouteInsertionIndex(nodes, [0.038, 0.001])).toBe(2)
+    expect(getRouteInsertionIndex([route.nodes[0]], [0.005, 0])).toBeNull()
+  })
+
   it('uses the routed geometry and accumulates segment distances', () => {
     const route = createRoute()
     const coordinates = getDisplayedRouteCoordinates(route)

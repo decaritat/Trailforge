@@ -82,7 +82,8 @@ once released versions are maintained.
 - Support for separate hiking and cycling routes with a name, description,
   independent preset/custom colors, and route type.
 - Routing through the configured routing provider with a direct fallback.
-- Route waypoint editing, including selection, deletion, and insertion.
+- Route waypoint editing, including selection, deletion, and insertion with a
+  live drag preview showing the new point and affected neighboring segments.
 - Elevation profile and route statistics for the active route.
 - GPX export, and saving and opening project files.
 - Interactive map points and POIs with symbols from OpenStreetMap Carto (CC0)
