@@ -50,7 +50,12 @@ once released versions are maintained.
 - Made project and route descriptions editable in bounded, 180-character drafts
   with explicit apply/cancel actions; route properties now open in a separate
   panel beside the route list.
-- Added GPX export into each route's action menu.
+- Added GPX export to editable routes' action menus and a plus-button flow for
+  creating a route or importing GPX. GPX imports are always read-only, retain
+  that state in project files, allow color and distance-marker changes, hide
+  route points, display any GPX route type as read-only, import GPX waypoints as
+  read-only POIs, cannot be re-exported as GPX, and use available timestamps and
+  elevations for route statistics.
 - Use elevation samples returned by BRouter and GPX files for route metrics,
   profiles, and GPX exports.
 - Added the map tool selection into a Leaflet-style control rail under the zoom
@@ -85,7 +90,7 @@ once released versions are maintained.
 - Route waypoint editing, including selection, deletion, and insertion with a
   live drag preview showing the new point and affected neighboring segments.
 - Elevation profile and route statistics for the active route.
-- GPX export, and saving and opening project files.
+- GPX export for editable routes, and saving and opening project files.
 - Interactive map points and POIs with symbols from OpenStreetMap Carto (CC0)
   plus a few custom ones, a symbol dropdown that overlays the editor,
   labeled white map markers anchored exactly at their coordinates,

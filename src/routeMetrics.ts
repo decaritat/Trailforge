@@ -116,7 +116,9 @@ export function profileDetailsAtIndex(
     profileFraction: distance / Math.max(1, totalDistance),
     distance,
     elevation: elevations[closestIndex] ?? elevationAt(coordinate),
-    elapsedMinutes: Math.max(0, Math.round((distance / speed) * 60 + ascent / 10)),
+    elapsedMinutes:
+      recordedElapsedMinutesAtIndex(route, closestIndex) ??
+      Math.max(0, Math.round((distance / speed) * 60 + ascent / 10)),
     coordinate,
   }
 }
@@ -153,6 +155,33 @@ export function selectedRoutePointDetails(route: Route, nodeId: string) {
   return profileDetailsAtIndex(route, closestIndex, nodeIndex)
 }
 
+function recordedDurationMinutes(route: Route) {
+  const timestamps = route.timestamps
+  if (!timestamps) return null
+  const validTimes = timestamps
+    .map((timestamp) => (timestamp ? Date.parse(timestamp) : Number.NaN))
+    .filter(Number.isFinite)
+  if (validTimes.length < 2) return null
+  const elapsedMilliseconds = validTimes.at(-1)! - validTimes[0]
+  return elapsedMilliseconds > 0
+    ? Math.max(1, Math.round(elapsedMilliseconds / 60_000))
+    : null
+}
+
+function recordedElapsedMinutesAtIndex(route: Route, index: number) {
+  const timestamps = route.timestamps
+  if (!timestamps) return null
+  const firstTime = timestamps
+    .map((timestamp) => (timestamp ? Date.parse(timestamp) : Number.NaN))
+    .find(Number.isFinite)
+  const currentTimestamp = timestamps[index]
+  if (firstTime === undefined || !currentTimestamp) return null
+  const currentTime = Date.parse(currentTimestamp)
+  return Number.isFinite(currentTime) && currentTime >= firstTime
+    ? Math.round((currentTime - firstTime) / 60_000)
+    : null
+}
+
 export function routeMetrics(route: Route) {
   const coordinates = getDisplayedRouteCoordinates(route)
   const elevations = getDisplayedRouteElevations(route)
@@ -166,7 +195,8 @@ export function routeMetrics(route: Route) {
     if (change < 0) descent += Math.abs(change)
   }
   const speed = route.type === 'hiking' ? 4.5 : 15
-  const durationMinutes = Math.max(1, Math.round((length / speed) * 60 + ascent / 10))
+  const durationMinutes =
+    recordedDurationMinutes(route) ?? Math.max(1, Math.round((length / speed) * 60 + ascent / 10))
   return {
     length,
     ascent,

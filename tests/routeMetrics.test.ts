@@ -74,6 +74,18 @@ describe('route geometry and metrics', () => {
     expect(routeMetrics(createRoute('cycling')).durationMinutes).toBe(14)
   })
 
+  it('uses imported GPX timestamps for duration when available', () => {
+    const route = createRoute()
+    route.timestamps = [
+      '2025-05-01T10:00:00Z',
+      '2025-05-01T10:30:00Z',
+      '2025-05-01T11:30:00Z',
+    ]
+
+    expect(routeMetrics(route).durationMinutes).toBe(90)
+    expect(profileDetailsAtFraction(route, 0.5)?.elapsedMinutes).toBe(30)
+  })
+
   it('falls back to generated geometry and elevations when routed data is unavailable', () => {
     const route = createRoute()
     delete route.geometry

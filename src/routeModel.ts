@@ -14,12 +14,14 @@ export type Route = {
   name: string
   description: string
   type: RouteType
+  gpxType?: string
   color?: string
   customColor?: string
   editable: boolean
   nodes: RouteNode[]
   geometry?: Coordinate[]
   elevations?: number[]
+  timestamps?: Array<string | null>
   routingState?: 'idle' | 'loading' | 'ready' | 'fallback'
   routingError?: string
   showDistanceMarkers?: boolean
@@ -43,6 +45,7 @@ export type MapPoint = {
   description: string
   coordinate: Coordinate
   source: 'manual' | 'poi'
+  editable?: boolean
   icon?: PoiIconId
 }
 
