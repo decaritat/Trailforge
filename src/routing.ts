@@ -33,6 +33,7 @@ export class RoutingError extends Error {
 export const ROUTING_PROVIDER = {
   id: 'brouter',
   label: 'BRouter',
+  attributionUrl: 'https://brouter.de/brouter-web/',
   endpoint: 'https://brouter.de/brouter',
   profiles: {
     hiking: 'hiking-beta',

@@ -14,6 +14,15 @@ import type { GeoJsonObject } from 'geojson'
 import 'leaflet/dist/leaflet.css'
 import './App.css'
 import AboutDialog from './AboutDialog'
+import { ExternalLink } from './ExternalLink'
+import { openExternalUrl } from './externalUrl'
+import {
+  GEOCODING_PROVIDER,
+  getInspectorElevationStatus,
+  getInspectorRouteStatus,
+  layers,
+  OSM_COPYRIGHT_URL,
+} from './providers'
 import {
   describeRoutingError,
   requestRouteGeometry,
@@ -155,14 +164,6 @@ type SavePickerWindow = Window & {
   }>
 }
 
-type LayerDefinition = {
-  id: string
-  label: string
-  tiles: string
-  attribution: string
-  requiresKey?: boolean
-}
-
 type PlaceSearchResult = {
   place_id: number
   display_name: string
@@ -171,21 +172,6 @@ type PlaceSearchResult = {
   boundingbox?: [string, string, string, string]
   geojson?: { type: string; coordinates: unknown }
 }
-
-const layers: LayerDefinition[] = [
-  {
-    id: 'osm',
-    label: 'OpenStreetMap Carto',
-    tiles: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '© OpenStreetMap contributors',
-  },
-  {
-    id: 'opentopomap',
-    label: 'OpenTopoMap',
-    tiles: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
-    attribution: '© OpenTopoMap · © OpenStreetMap contributors',
-  },
-]
 
 const GEOCODING_ENDPOINT = 'https://nominatim.openstreetmap.org/search'
 const routeColors = [
@@ -238,7 +224,7 @@ function LayerDropdown({
   onChange,
 }: {
   value: string
-  options: Array<{ id: string; label: string }>
+  options: Array<{ id: string; label: string; provider?: string; attributionUrl?: string }>
   disabled?: boolean
   onChange: (id: string) => void
 }) {
@@ -301,7 +287,28 @@ function LayerDropdown({
                 setOpen(false)
               }}
             >
-              {option.label}
+              <span>{option.label}</span>
+              {option.attributionUrl && (
+                <span
+                  className="dropdown-item-attribution"
+                  role="button"
+                  tabIndex={0}
+                  title={`Attribution & Lizenz für ${option.label} (${option.provider ?? option.label}) öffnen`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    openExternalUrl(option.attributionUrl!)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.stopPropagation()
+                      e.preventDefault()
+                      openExternalUrl(option.attributionUrl!)
+                    }
+                  }}
+                >
+                  ©
+                </span>
+              )}
             </li>
           ))}
         </ul>
@@ -465,12 +472,32 @@ function App() {
     return () => window.removeEventListener('pointerdown', closeOnOutsideClick)
   }, [openRouteMenu])
 
+  useEffect(() => {
+    if (!isTauri()) return
+    const handleLinkClick = (event: globalThis.MouseEvent) => {
+      const target = (event.target as HTMLElement | null)?.closest('a')
+      if (target && target.href && /^https?:\/\//i.test(target.href)) {
+        event.preventDefault()
+        openExternalUrl(target.href)
+      }
+    }
+    document.addEventListener('click', handleLinkClick)
+    return () => {
+      document.removeEventListener('click', handleLinkClick)
+    }
+  }, [])
+
   const activeRoute =
     project.routes.find((route) => route.id === project.activeRouteId) ?? project.routes[0]
   const routePropertiesOpen = Boolean(routeEditor || pointEditor)
   const activeMetrics = useMemo(
     () => (activeRoute ? routeMetrics(activeRoute) : null),
     [activeRoute],
+  )
+  const inspectorRouteStatus = getInspectorRouteStatus(activeRoute)
+  const inspectorElevationStatus = getInspectorElevationStatus(
+    activeRoute,
+    activeMetrics?.elevations.length ?? 0,
   )
   const selectedPointDetails = useMemo(() => {
     if (!selectedNode) return null
@@ -1658,9 +1685,18 @@ function App() {
         />
         <span className="route-description-length">{route.description.length}/180 Zeichen</span>
         <div className="route-editor-section">
-          <label className="route-editor-section-label" htmlFor={`route-type-${route.id}`}>
-            Routentyp
-          </label>
+          <div className="route-editor-section-header">
+            <label className="route-editor-section-label" htmlFor={`route-type-${route.id}`}>
+              Routentyp
+            </label>
+            <ExternalLink
+              url={ROUTING_PROVIDER.attributionUrl}
+              className="route-editor-provider-link"
+              title={`Routing über ${ROUTING_PROVIDER.label} (${routingProfileLabel(route.type)})`}
+            >
+              via {ROUTING_PROVIDER.label}
+            </ExternalLink>
+          </div>
           <select
             id={`route-type-${route.id}`}
             value={route.type}
@@ -1968,6 +2004,8 @@ function App() {
               options={layers.map((layer) => ({
                 id: layer.id,
                 label: `${layer.label}${layer.requiresKey ? ' · API-Key' : ''}`,
+                provider: layer.provider,
+                attributionUrl: layer.attributionUrl,
               }))}
               onChange={(nextLayerId) => {
                 const nextLayer = layers.find((layer) => layer.id === nextLayerId)
@@ -1980,6 +2018,18 @@ function App() {
                 setProject((current) => ({ ...current, mapLayerId: nextLayerId }))
               }}
             />
+            {(() => {
+              const activeLayerDef = layers.find((layer) => layer.id === layerId) ?? layers[0]
+              return (
+                <ExternalLink
+                  url={activeLayerDef.attributionUrl}
+                  className="layer-attribution-badge"
+                  title={`Attribution & Lizenz für ${activeLayerDef.label} (${activeLayerDef.provider}) öffnen`}
+                >
+                  © {activeLayerDef.provider}
+                </ExternalLink>
+              )
+            })()}
           </div>
           <button className="ghost-button" onClick={() => projectInput.current?.click()}>
             Projekt öffnen
@@ -2254,12 +2304,19 @@ function App() {
                       : ''
                 }`}
               />
+              <ExternalLink
+                url={ROUTING_PROVIDER.attributionUrl}
+                className="provider-name-link"
+                title={`${ROUTING_PROVIDER.label} Attribution und Projekt öffnen`}
+              >
+                {ROUTING_PROVIDER.label}
+              </ExternalLink>
               <span>
                 {project.routes.some((route) => route.routingState === 'fallback')
-                  ? `${ROUTING_PROVIDER.label} nicht erreichbar`
+                  ? 'nicht erreichbar'
                   : project.routes.some((route) => route.routingState === 'loading')
-                    ? `${ROUTING_PROVIDER.label} wird verwendet`
-                    : `${ROUTING_PROVIDER.label} bereit`}
+                    ? 'wird verwendet'
+                    : 'bereit'}
               </span>
               <span
                 className="status-info"
@@ -2340,14 +2397,23 @@ function App() {
                         ))}
                       </ul>
                     )}
-                    <a
-                      className="map-search-attribution"
-                      href="https://www.openstreetmap.org/copyright"
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      Geocoding-Daten © OpenStreetMap-Mitwirkende
-                    </a>
+                    <div className="map-search-attribution-bar">
+                      <ExternalLink
+                        className="map-search-attribution"
+                        url={GEOCODING_PROVIDER.url}
+                        title="Nominatim Nutzungsbedingungen und Richtlinien öffnen"
+                      >
+                        Nominatim
+                      </ExternalLink>
+                      <span className="map-search-attribution-sep">·</span>
+                      <ExternalLink
+                        className="map-search-attribution"
+                        url={OSM_COPYRIGHT_URL}
+                        title="OpenStreetMap Copyright & Lizenz (ODbL) öffnen"
+                      >
+                        Geocoding-Daten © OpenStreetMap
+                      </ExternalLink>
+                    </div>
                   </section>
                 )}
               </div>
@@ -2469,39 +2535,52 @@ function App() {
                 <div className="inspector-actions">
                   <span
                     className={`inspector-route-status ${
-                      activeRoute?.routingState === 'fallback' ? 'error' : ''
+                      inspectorRouteStatus.isError ? 'error' : ''
                     }`}
+                    title={inspectorRouteStatus.tooltip}
+                    tabIndex={0}
                   >
-                    {!activeRoute
-                      ? 'Keine aktive Route'
-                      : activeRoute.routingState === 'loading'
-                        ? 'Route wird berechnet …'
-                        : activeRoute.routingState === 'fallback'
-                          ? 'Direkter Fallback'
-                          : activeRoute.routingState === 'idle' || activeRoute.nodes.length < 2
-                            ? activeRoute.nodes.length < 2
-                              ? 'Mindestens zwei Punkte erforderlich'
-                              : 'Routing wird vorbereitet …'
-                            : 'Routing aktiv'}
+                    {inspectorRouteStatus.text}
+                  </span>
+                  <span
+                    className={`inspector-elevation-status ${
+                      inspectorElevationStatus.active ? '' : 'inactive'
+                    }`}
+                    title={inspectorElevationStatus.tooltip}
+                    tabIndex={0}
+                  >
+                    {inspectorElevationStatus.text}
                   </span>
                 </div>
               </div>
               {!elevationExpanded && (
                 <div className="compact-inspector-content">
                   <div className="compact-metric-grid">
-                    <span><strong>{activeMetrics?.length.toFixed(1) ?? '0.0'}</strong> km</span>
-                    <span><strong>{activeMetrics ? formatDuration(activeMetrics.durationMinutes) : '–'}</strong></span>
-                    <span><strong>{Math.round(activeMetrics?.ascent ?? 0)}</strong> m Aufstieg</span>
-                    <span><strong>{Math.round(activeMetrics?.descent ?? 0)}</strong> m Abstieg</span>
-                    <span><strong>{activeMetrics?.high ?? 0}</strong> m höchster</span>
-                    <span><strong>{activeMetrics?.low ?? 0}</strong> m niedrigster</span>
+                    <span title="Distanz: Gesamtlänge der aktiven Route">
+                      <strong>{activeMetrics?.length.toFixed(1) ?? '0.0'}</strong> km
+                    </span>
+                    <span title="Dauer: Geschätzte Geh- bzw. Fahrzeit basierend auf Streckenlänge und Höhenmetern">
+                      <strong>{activeMetrics ? formatDuration(activeMetrics.durationMinutes) : '–'}</strong>
+                    </span>
+                    <span title="Aufstieg: Summe aller positiven Höhenmeter entlang der Route">
+                      <strong>{Math.round(activeMetrics?.ascent ?? 0)}</strong> m Aufstieg
+                    </span>
+                    <span title="Abstieg: Summe aller negativen Höhenmeter entlang der Route">
+                      <strong>{Math.round(activeMetrics?.descent ?? 0)}</strong> m Abstieg
+                    </span>
+                    <span title="Höchster Punkt: Maximale Höhe über dem Meeresspiegel">
+                      <strong>{activeMetrics?.high ?? 0}</strong> m höchster
+                    </span>
+                    <span title="Niedrigster Punkt: Minimale Höhe über dem Meeresspiegel">
+                      <strong>{activeMetrics?.low ?? 0}</strong> m niedrigster
+                    </span>
                   </div>
                   <button
                     className="elevation-mini-chart-button"
                     type="button"
                     onClick={() => setElevationExpanded(true)}
-                    aria-label="Höhenprofil ausklappen"
-                    title="Höhenprofil ausklappen"
+                    aria-label="Höhenprofil ausklappen: Interaktives Profil mit Höhen- und Distanzanalyse öffnen"
+                    title="Höhenprofil ausklappen: Interaktives Profil mit Höhen- und Distanzanalyse öffnen"
                   >
                     <svg
                       viewBox="0 0 260 52"
@@ -2532,27 +2611,27 @@ function App() {
               )}
               {elevationExpanded && (
                 <div className="metric-grid">
-                  <div className="metric">
+                  <div className="metric" title="Distanz: Gesamtlänge der aktiven Route">
                     <span className="metric-label">Distanz</span>
                     <strong>{activeMetrics?.length.toFixed(1) ?? '0.0'} <small>km</small></strong>
                   </div>
-                  <div className="metric">
+                  <div className="metric" title="Dauer: Geschätzte Geh- bzw. Fahrzeit basierend auf Streckenlänge und Höhenmetern">
                     <span className="metric-label">Dauer</span>
                     <strong>{activeMetrics ? formatDuration(activeMetrics.durationMinutes) : '–'}</strong>
                   </div>
-                  <div className="metric">
+                  <div className="metric" title="Aufstieg: Summe aller positiven Höhenmeter entlang der Route">
                     <span className="metric-label">Aufstieg</span>
                     <strong>{Math.round(activeMetrics?.ascent ?? 0)} <small>m</small></strong>
                   </div>
-                  <div className="metric">
+                  <div className="metric" title="Abstieg: Summe aller negativen Höhenmeter entlang der Route">
                     <span className="metric-label">Abstieg</span>
                     <strong>{Math.round(activeMetrics?.descent ?? 0)} <small>m</small></strong>
                   </div>
-                  <div className="metric">
+                  <div className="metric" title="Höchster Punkt: Maximale Höhe über dem Meeresspiegel">
                     <span className="metric-label">Höchster Punkt</span>
                     <strong>{activeMetrics?.high ?? 0} <small>m</small></strong>
                   </div>
-                  <div className="metric">
+                  <div className="metric" title="Niedrigster Punkt: Minimale Höhe über dem Meeresspiegel">
                     <span className="metric-label">Niedrigster Punkt</span>
                     <strong>{activeMetrics?.low ?? 0} <small>m</small></strong>
                   </div>
@@ -2563,6 +2642,15 @@ function App() {
               <div className="elevation-card">
                 <div className="elevation-header">
                   <span className="eyebrow">Höhenprofil</span>
+                  <span
+                    className={`elevation-profile-status ${
+                      inspectorElevationStatus.active ? '' : 'inactive'
+                    }`}
+                    title={inspectorElevationStatus.tooltip}
+                    tabIndex={0}
+                  >
+                    {inspectorElevationStatus.text}
+                  </span>
                 </div>
                 <div className={`profile-chart-area ${profilePointDetails ? 'has-selection' : ''}`}>
                   <svg
@@ -2789,10 +2877,6 @@ function App() {
           </section>
         </section>
       </main>
-      <footer className="app-footer">
-        <span>Trailforge · Open Source Route Planner</span>
-        <span>© OpenStreetMap contributors · Provider-Attribution beachten</span>
-      </footer>
       {aboutOpen && <AboutDialog onClose={() => setAboutOpen(false)} />}
     </div>
   )
